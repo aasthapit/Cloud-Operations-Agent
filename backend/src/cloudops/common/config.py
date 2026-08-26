@@ -27,14 +27,12 @@ import os
 import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 import structlog
 import yaml
 
 log = structlog.get_logger("cloudops.config")
-
-T = TypeVar("T")
 
 _ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::([^}]*))?\}")
 
@@ -75,7 +73,7 @@ def config_version(paths: list[Path]) -> str:
     return digest.hexdigest()[:7]
 
 
-class HotConfig(Generic[T]):
+class HotConfig[T]:
     """A validated YAML file with last-known-good hot reload."""
 
     def __init__(

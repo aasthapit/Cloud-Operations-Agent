@@ -208,6 +208,8 @@ async def resolve(
                 "outside your registered set."
             ), None
 
+    assert chosen_app is not None  # every earlier branch returned or assigned
+
     # -- verify placement fleet-wide (FR-CTX-2) ------------------------------
     app_label = chosen_app.get("app_label", chosen_app["application"])
     placements_result = await client.call("obs__find_app_placements", {"app_label": app_label})

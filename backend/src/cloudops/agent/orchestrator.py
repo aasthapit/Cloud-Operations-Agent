@@ -71,7 +71,7 @@ class TriageOrchestrator(BaseAgent):
         super().__init__(
             name="triage_orchestrator",
             description="First-level OpenShift fleet triage: attest, resolve, report, investigate",
-            analyst=analyst,
+            analyst=analyst,  # type: ignore[call-arg]  # pydantic field on this subclass
             sub_agents=[analyst],
         )
 
@@ -140,9 +140,13 @@ class TriageOrchestrator(BaseAgent):
         bind_thread(thread_id=thread_id, user_sub=claims.sub or None)
         base_delta = {"claims": claims_dict, "thread_id": thread_id, "user_sub": claims.sub}
 
-        user_text = ""
+        texts: list[str] = []
         if ctx.user_content and ctx.user_content.parts:
-            user_text = " ".join(p.text for p in ctx.user_content.parts if getattr(p, "text", None))
+            for part in ctx.user_content.parts:
+                part_text = getattr(part, "text", None)
+                if isinstance(part_text, str):
+                    texts.append(part_text)
+        user_text = " ".join(texts)
 
         tuning = agent_tuning(settings.config_dir)
         registry = self._load("fleet/applications.yaml")
@@ -236,10 +240,12 @@ class TriageOrchestrator(BaseAgent):
                         instances=[i.model_dump() for i in context.instances[:3]],
                     ))
                     for instance in context.instances[:3]:  # cap per FR-360-8 pragmatics
-                        att = next((a for a in in_scope if a.cluster == instance.cluster), None)
+                        host_att = next(
+                            (a for a in in_scope if a.cluster == instance.cluster), None
+                        )
                         report = await check_engine.run_app360(
                             app_battery, context.application or "", context.app_label or "",
-                            instance, att, gc, a360_version,
+                            instance, host_att, gc, a360_version,
                         )
                         app360_compact.append(_compact_app360(report))
                         yield self._event(fence("app360", report.model_dump(mode="json")))

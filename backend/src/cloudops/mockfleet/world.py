@@ -225,7 +225,7 @@ class World:
         fault = self._fault(cluster)
         upgrading_to = fault.get("upgrading_to")
         version = str(c.get("version"))
-        history = [{"version": version, "state": "Completed",
+        history: list[dict[str, Any]] = [{"version": version, "state": "Completed",
                     "completed_at": (_now() - timedelta(days=11)).isoformat()}]
         if upgrading_to:
             history.insert(0, {"version": upgrading_to, "state": "Partial", "completed_at": None})
@@ -423,7 +423,7 @@ class World:
         ]
         return {
             "cluster": cluster, "namespace": namespace, "quotas": quotas,
-            "near_limit": [q for q in quotas if q["ratio"] > 0.9],
+            "near_limit": [q for q in quotas if float(str(q["ratio"])) > 0.9],
             "limit_ranges": ["default-limits"],
             "summary": f"cpu {int(used_ratio * 100)}% / mem {int(used_ratio * 100)}% of quota",
         }
@@ -441,7 +441,7 @@ class World:
             "services": [{"name": app_label, "type": "ClusterIP", "ports": [8080]}],
             "routes": routes,
             "routes_summary": f"1 route, cert expires in {expiry_days}d",
-            "expiring_certs": [r["name"] for r in routes if r["cert_expiry_days"] < 30],
+            "expiring_certs": [r["name"] for r in routes if int(str(r["cert_expiry_days"])) < 30],
             "network_policies_count": 2,
             "dns_healthy": True,
         }
@@ -456,7 +456,7 @@ class World:
         return {
             "cluster": cluster, "namespace": namespace, "pvcs": pvcs,
             "unbound": [p["name"] for p in pvcs if p["status"] != "Bound"],
-            "near_full": [p["name"] for p in pvcs if p["used_ratio"] > 0.9],
+            "near_full": [p["name"] for p in pvcs if float(str(p["used_ratio"])) > 0.9],
             "summary": f"{len(pvcs)} PVC(s)" if pvcs else "no persistent volumes",
         }
 
