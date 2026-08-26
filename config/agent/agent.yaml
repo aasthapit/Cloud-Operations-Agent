@@ -1,0 +1,33 @@
+# ============================================================================
+# Agent composition. Hot-reloaded on save.
+#
+# The agent's system instruction is assembled fresh on every LLM invocation
+# from the files listed here, in order:
+#   1. persona_file       - who the agent is, tone, hard rules
+#   2. routing_file       - the triage flow it must follow
+#   3. each enabled skill - focused how-to blocks the persona can lean on
+# Editing any of these files (or toggling a skill) takes effect on the very
+# next message in any conversation, with no restart.
+# ============================================================================
+
+persona_file: system_prompt.md
+routing_file: routing.md
+
+skills:
+  - file: skills/cluster-health-triage.md
+    enabled: true
+  - file: skills/app360-analysis.md
+    enabled: true
+  - file: skills/prometheus-query-crafting.md
+    enabled: true
+
+# Context resolution policy. The deterministic orchestrator (not the LLM)
+# enforces these before any report runs.
+context:
+  # The agent must know which application it is triaging. If the signed-in
+  # user maps to exactly one application it is auto-selected; otherwise the
+  # agent asks the user to pick.
+  require_application: true
+  # Ask for the environment (prod / nonprod) when the application runs in
+  # more than one and the user has not said which they mean.
+  require_environment: true
