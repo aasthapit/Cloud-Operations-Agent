@@ -1,0 +1,731 @@
+<!-- Cloud Operations Agent User Flows - HTML artifact source.
+     Companion to docs/PRD.html; shares its design tokens so the two read as one document family.
+     Storyboards are experience-level; system-level sequence diagrams live in the PRD, section 9. -->
+<title>Cloud Operations Agent User Flows</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #F7F5F2;
+    --surface: #FFFFFF;
+    --surface2: #EFECE6;
+    --ink: #20242A;
+    --muted: #5C6167;
+    --faint: #878C93;
+    --line: #E1DDD6;
+    --line-strong: #C7C2B9;
+    --band: #A8232F;
+    --band-deep: #8C1D27;
+    --band-ink: #FFF7F4;
+    --accent: #A8232F;
+    --gold: #B7891F;
+    --ok: #1E7A3C;
+    --ok-bg: #E4F0E7;
+    --warn: #96650A;
+    --warn-bg: #F5EBD7;
+    --crit: #B3262E;
+    --crit-bg: #F7E4E4;
+    --info: #1F5FA8;
+    --info-bg: #E3EBF5;
+    --neutral-bg: #ECE9E3;
+    --code-bg: #F0EDE8;
+    --shadow: 0 1px 2px rgba(32,36,42,.06), 0 4px 14px rgba(32,36,42,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #16181C;
+      --surface: #1E2126;
+      --surface2: #23262C;
+      --ink: #E7E6E2;
+      --muted: #A6AAB0;
+      --faint: #7E838A;
+      --line: #2E3238;
+      --line-strong: #41464E;
+      --band: #6F1E27;
+      --band-deep: #5C1820;
+      --band-ink: #F6E9E7;
+      --accent: #DA5C67;
+      --gold: #CDA04A;
+      --ok: #5CB177;
+      --ok-bg: #1E2C22;
+      --warn: #D2A044;
+      --warn-bg: #2E2818;
+      --crit: #E0606B;
+      --crit-bg: #33201F;
+      --info: #74A8DE;
+      --info-bg: #1C2733;
+      --neutral-bg: #282C32;
+      --code-bg: #14161A;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #16181C;
+    --surface: #1E2126;
+    --surface2: #23262C;
+    --ink: #E7E6E2;
+    --muted: #A6AAB0;
+    --faint: #7E838A;
+    --line: #2E3238;
+    --line-strong: #41464E;
+    --band: #6F1E27;
+    --band-deep: #5C1820;
+    --band-ink: #F6E9E7;
+    --accent: #DA5C67;
+    --gold: #CDA04A;
+    --ok: #5CB177;
+    --ok-bg: #1E2C22;
+    --warn: #D2A044;
+    --warn-bg: #2E2818;
+    --crit: #E0606B;
+    --crit-bg: #33201F;
+    --info: #74A8DE;
+    --info-bg: #1C2733;
+    --neutral-bg: #282C32;
+    --code-bg: #14161A;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+  }
+
+  .masthead {
+    background: linear-gradient(180deg, var(--band) 0%, var(--band-deep) 100%);
+    color: var(--band-ink);
+    border-bottom: 3px solid var(--gold);
+    padding: 40px 24px 30px;
+  }
+  .masthead-inner { max-width: 1080px; margin: 0 auto; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    opacity: .85; margin: 0 0 10px;
+  }
+  .masthead h1 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-weight: 700; font-size: clamp(30px, 5vw, 44px); line-height: 1.12;
+    margin: 0 0 6px; text-wrap: balance;
+  }
+  .masthead .sub { font-size: 17px; max-width: 62ch; margin: 0 0 18px; opacity: .92; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .meta-chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px;
+    padding: 3px 10px; border: 1px solid rgba(255,255,255,.35); border-radius: 3px;
+    background: rgba(0,0,0,.14);
+  }
+
+  .shell { max-width: 1080px; margin: 0 auto; padding: 0 24px 90px; display: block; }
+  @media (min-width: 1100px) {
+    .shell { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 44px; }
+  }
+  nav.toc { display: none; }
+  @media (min-width: 1100px) {
+    nav.toc { display: block; }
+    .toc-stick { position: sticky; top: 18px; padding-top: 34px; }
+    nav.toc h2 {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--faint); margin: 0 0 10px; font-weight: 500;
+    }
+    nav.toc ol { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.4; }
+    nav.toc a {
+      display: flex; gap: 8px; padding: 4.5px 8px; color: var(--muted);
+      text-decoration: none; border-left: 2px solid var(--line); border-radius: 0 3px 3px 0;
+    }
+    nav.toc a:hover { color: var(--ink); background: var(--surface2); }
+    nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    nav.toc .n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: var(--faint); min-width: 20px; text-align: right; padding-top: 1px; }
+  }
+  main { min-width: 0; }
+
+  section.doc { margin-top: 52px; }
+  section.doc > h2 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 27px; font-weight: 600; line-height: 1.2;
+    margin: 0 0 4px; padding-top: 14px;
+    border-top: 1px solid var(--line-strong);
+    text-wrap: balance;
+  }
+  section.doc > h2 .secnum {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 15px; font-weight: 500; color: var(--gold);
+    margin-right: 10px; vertical-align: 2px;
+  }
+  h3 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 19px; font-weight: 600; margin: 34px 0 4px; text-wrap: balance;
+  }
+  h3 .fid {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px; color: var(--gold); margin-right: 8px; font-weight: 500;
+  }
+  p { margin: 10px 0; max-width: 72ch; }
+  ul, ol { margin: 10px 0; padding-left: 26px; max-width: 70ch; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  strong { font-weight: 600; }
+  .lede { font-size: 17.5px; max-width: 68ch; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .88em; }
+  code { background: var(--code-bg); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; }
+
+  .pill {
+    display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 1.5px 8px; border-radius: 999px; white-space: nowrap; font-weight: 500;
+  }
+  .pill.ok   { color: var(--ok);   background: var(--ok-bg); }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); }
+  .pill.crit { color: var(--crit); background: var(--crit-bg); }
+  .pill.info { color: var(--info); background: var(--info-bg); }
+  .pill.dim  { color: var(--muted); background: var(--neutral-bg); }
+
+  .tablewrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line-strong); border-radius: 5px; box-shadow: var(--shadow); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; line-height: 1.5; }
+  th {
+    text-align: left; font-weight: 600; font-size: 12.4px;
+    text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+    background: var(--surface2); padding: 8px 14px; border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
+  figure { margin: 22px 0; }
+  .figure-panel {
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px;
+    padding: 18px; overflow-x: auto; box-shadow: var(--shadow);
+  }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 76ch; }
+  figcaption .fig-n { font-family: "IBM Plex Mono", ui-monospace, monospace; color: var(--gold); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; margin-right: 6px; }
+  .dg { font-family: "IBM Plex Sans", Arial, sans-serif; font-size: 12.5px; }
+  .dg-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; }
+  .halo { paint-order: stroke; stroke: var(--surface); stroke-width: 3.5px; stroke-linejoin: round; }
+
+  /* ---------- Storyboards ---------- */
+  .story {
+    border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface);
+    box-shadow: var(--shadow); overflow: hidden; margin: 18px 0;
+  }
+  .story-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--surface2);
+  }
+  .story-head .t { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .story-body { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+  @media (max-width: 860px) { .story-body { grid-template-columns: 1fr; } }
+  .convo {
+    padding: 14px; display: flex; flex-direction: column; gap: 9px;
+    background: var(--paper); border-right: 1px solid var(--line); font-size: 12.5px; line-height: 1.5;
+  }
+  @media (max-width: 860px) { .convo { border-right: none; border-bottom: 1px solid var(--line); } }
+  .b-user, .b-agent {
+    border-radius: 8px; padding: 7px 11px; max-width: 92%; position: relative;
+  }
+  .b-user  { align-self: flex-end; background: var(--info-bg); border: 1px solid var(--line); }
+  .b-agent { align-self: flex-start; background: var(--surface2); border: 1px solid var(--line); }
+  .b-who { font-size: 9.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin-bottom: 2px; font-weight: 600; }
+  .b-tick {
+    align-self: flex-start; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; padding: 0 4px;
+  }
+  .b-tick .tk { color: var(--ok); }
+  .b-tick .tw { color: var(--warn); }
+  .b-card {
+    align-self: stretch; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface);
+    padding: 6px 11px; font-size: 11.5px; font-weight: 600;
+  }
+  .b-card .sub { font-weight: 400; color: var(--muted); font-size: 10.5px; }
+  .qp { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .qp span {
+    border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 10px;
+    font-size: 11px; background: var(--surface); color: var(--ink);
+  }
+  .nb {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--gold); color: #2E2304;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; font-weight: 500;
+    flex: none;
+  }
+  .b-user .nb, .b-agent .nb { position: absolute; top: -7px; }
+  .b-user .nb { left: -7px; }
+  .b-agent .nb { right: -7px; }
+  .notes { padding: 12px 16px; }
+  .notes h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .notes ol { list-style: none; margin: 0; padding: 0; }
+  .notes li { display: flex; gap: 9px; margin: 0 0 9px; font-size: 12.8px; line-height: 1.5; }
+  .notes li .nb { margin-top: 2px; }
+  .notes .fr { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+  .outcome {
+    border-top: 1px solid var(--line); background: var(--surface); padding: 8px 14px;
+    font-size: 12.5px; grid-column: 1 / -1;
+  }
+  .outcome b { font-weight: 600; }
+
+  /* report interaction mock (F7) */
+  .report-card { border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--surface); font-size: 12px; }
+  .report-card .rh {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    background: var(--surface2); border-bottom: 1px solid var(--line); padding: 7px 11px;
+    font-weight: 600; font-size: 11.5px;
+  }
+  .report-card .sec { display: flex; justify-content: space-between; gap: 8px; padding: 4.5px 11px; border-bottom: 1px solid var(--line); }
+  .report-card .sec:last-child { border-bottom: none; }
+  .report-card .sec .sn { color: var(--muted); }
+  .report-card .sec-detail {
+    background: var(--code-bg); border-bottom: 1px solid var(--line);
+    padding: 6px 11px 7px 24px; display: flex; flex-direction: column; gap: 2px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; color: var(--muted);
+  }
+  .report-card .sec-detail .dhl { color: var(--ink); }
+  .report-card .sec-detail a { color: var(--accent); }
+  .export-row { display: flex; gap: 8px; padding: 8px 11px; border-top: 1px solid var(--line); background: var(--surface2); }
+  .export-row span {
+    border: 1px solid var(--line-strong); border-radius: 5px; padding: 3px 12px;
+    font-size: 11px; font-weight: 600; background: var(--surface);
+  }
+
+  .callout {
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px;
+    padding: 14px 18px; margin: 18px 0; box-shadow: var(--shadow); max-width: none;
+  }
+  .callout .callout-tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--gold);
+    display: block; margin-bottom: 4px; font-weight: 500;
+  }
+  .callout p { max-width: none; margin: 6px 0; }
+  footer.colophon {
+    margin-top: 70px; padding-top: 16px; border-top: 1px solid var(--line-strong);
+    font-size: 12.8px; color: var(--muted);
+  }
+  footer.colophon p { max-width: none; }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <p class="eyebrow">User Flow Specification &middot; companion to the PRD</p>
+    <h1>Cloud Operations Agent User Flows</h1>
+    <p class="sub">What each persona sees, says, and gets: nine flows from first question to escalation, told as annotated conversation storyboards over the two enforced gates of every turn.</p>
+    <div class="meta-row">
+      <span class="meta-chip">v0.1 draft</span>
+      <span class="meta-chip">2026-08-25</span>
+      <span class="meta-chip">9 flows</span>
+      <span class="meta-chip">owner: platform engineering</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-stick">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#s1"><span class="n">1</span> Entry points</a></li>
+      <li><a href="#s2"><span class="n">2</span> Turn lifecycle</a></li>
+      <li><a href="#f1"><span class="n">F1</span> First contact</a></li>
+      <li><a href="#f2"><span class="n">F2</span> Clarification</a></li>
+      <li><a href="#f3"><span class="n">F3</span> Onboarding</a></li>
+      <li><a href="#f4"><span class="n">F4</span> Platform fault</a></li>
+      <li><a href="#f5"><span class="n">F5</span> Stale re-attest</a></li>
+      <li><a href="#f6"><span class="n">F6</span> Direct attest</a></li>
+      <li><a href="#f7"><span class="n">F7</span> Drill-down</a></li>
+      <li><a href="#f8"><span class="n">F8</span> Failure modes</a></li>
+      <li><a href="#f9"><span class="n">F9</span> Operator config</a></li>
+      <li><a href="#s3"><span class="n">3</span> Coverage matrix</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main>
+
+<!-- ================================ 1 ================================ -->
+<section class="doc" id="s1">
+  <h2><span class="secnum">1</span>Personas and entry points</h2>
+  <p class="lede">Every flow starts from one of four personas and the state the system finds them in. The console never asks for anything it can resolve itself; the flows below show exactly where it asks, and why.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Persona</th><th>Entry state</th><th>Typical opening</th><th>Primary flows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>App developer</strong></td><td>One registered application</td><td>&ldquo;Why is payments-api flaky in prod?&rdquo;</td><td><a href="#f1">F1</a>, <a href="#f5">F5</a>, <a href="#f7">F7</a></td></tr>
+      <tr><td><strong>SRE / platform engineer</strong></td><td>Many registered applications, deep platform knowledge</td><td>&ldquo;Is my stuff healthy?&rdquo; / &ldquo;attest prod-east-2&rdquo;</td><td><a href="#f2">F2</a>, <a href="#f4">F4</a>, <a href="#f6">F6</a></td></tr>
+      <tr><td><strong>New team member</strong></td><td>No registered applications</td><td>&ldquo;Why is my app slow?&rdquo;</td><td><a href="#f3">F3</a></td></tr>
+      <tr><td><strong>Operator</strong></td><td>Edits the config plane, not the chat</td><td>Edits <span class="mono">checks/app360.yaml</span></td><td><a href="#f9">F9</a></td></tr>
+    </tbody>
+  </table></div>
+  <p>The ops manager persona from the PRD consumes the exported reports produced in <a href="#f7">F7</a> rather than driving conversations.</p>
+</section>
+
+<!-- ================================ 2 ================================ -->
+<section class="doc" id="s2">
+  <h2><span class="secnum">2</span>The turn lifecycle</h2>
+  <p>Every flow in this document is a path through the same turn skeleton. Two gates are enforced by the agent runtime in code, not by prompt (PRD decision D1): the <strong>context gate</strong> (know the user, application, and clusters before analysis) and the <strong>attestation gate</strong> (fresh platform health before any answer).</p>
+  <figure>
+    <div class="figure-panel">
+      <svg viewBox="0 0 1240 400" role="img" aria-label="Turn lifecycle state machine: a user message passes the context gate, which may ask one clarifying question, then the attestation gate, which runs the battery when stale; the Application 360 battery runs on first resolution, then LLM analysis with tools, then the streamed response with typed cards; any phase failure exits with a structured error and correlation id" style="min-width:940px">
+        <defs>
+          <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <!-- main lane boxes -->
+        <g fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="20" y="182" width="150" height="56" rx="5"/>
+          <rect x="560" y="184" width="190" height="52" rx="5"/>
+          <rect x="800" y="184" width="190" height="52" rx="5"/>
+          <rect x="1040" y="184" width="180" height="52" rx="5"/>
+          <rect x="190" y="58" width="230" height="50" rx="5"/>
+          <rect x="345" y="300" width="210" height="50" rx="5"/>
+          <rect x="800" y="316" width="420" height="46" rx="5" stroke-dasharray="5 4" opacity=".65"/>
+        </g>
+        <!-- gates: accented diamonds (the enforced discipline) -->
+        <g fill="none" stroke="var(--accent)" stroke-width="1.7">
+          <path d="M205,210 L265,180 L325,210 L265,240 Z"/>
+          <path d="M372,210 L432,180 L492,210 L432,240 Z"/>
+        </g>
+        <!-- main flow arrows -->
+        <g stroke="currentColor" stroke-width="1.3" fill="none">
+          <line x1="170" y1="210" x2="203" y2="210" marker-end="url(#fa)"/>
+          <line x1="325" y1="210" x2="370" y2="210" marker-end="url(#fa)"/>
+          <line x1="492" y1="210" x2="558" y2="210" marker-end="url(#fa)"/>
+          <line x1="750" y1="210" x2="798" y2="210" marker-end="url(#fa)"/>
+          <line x1="990" y1="210" x2="1038" y2="210" marker-end="url(#fa)"/>
+          <path d="M265,180 L265,133 L305,108" marker-end="url(#fa)"/>
+          <path d="M432,240 L432,298" marker-end="url(#fa)"/>
+          <path d="M555,325 L620,238" marker-end="url(#fa)"/>
+        </g>
+        <!-- dashed return / error arrows -->
+        <g stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="5 4" opacity=".7">
+          <path d="M190,83 L95,83 L95,180" marker-end="url(#fa)"/>
+          <path d="M1130,184 L1130,30 L95,30 L95,180" marker-end="url(#fa)"/>
+          <path d="M895,236 L895,314" marker-end="url(#fa)"/>
+          <path d="M555,340 L798,342" marker-end="url(#fa)"/>
+        </g>
+        <!-- labels -->
+        <g fill="currentColor" class="dg">
+          <text x="95" y="206" text-anchor="middle" font-weight="600">User message</text>
+          <text x="95" y="223" text-anchor="middle" font-size="11" opacity=".7">thread = contextId</text>
+          <text x="265" y="206" text-anchor="middle" font-size="11.5" fill="var(--accent)" font-weight="600">context</text>
+          <text x="265" y="220" text-anchor="middle" font-size="11.5" fill="var(--accent)">resolved?</text>
+          <text x="432" y="206" text-anchor="middle" font-size="11.5" fill="var(--accent)" font-weight="600">attested</text>
+          <text x="432" y="220" text-anchor="middle" font-size="11.5" fill="var(--accent)">&amp; fresh?</text>
+          <text x="305" y="80" text-anchor="middle" font-weight="600">Ask ONE clarifying question</text>
+          <text x="305" y="97" text-anchor="middle" font-size="11" opacity=".7">A2A input-required &middot; options listed</text>
+          <text x="450" y="322" text-anchor="middle" font-weight="600">Run attestation battery</text>
+          <text x="450" y="339" text-anchor="middle" font-size="11" opacity=".7">per cluster &middot; health_attestation.yaml</text>
+          <text x="655" y="206" text-anchor="middle" font-weight="600">Application 360</text>
+          <text x="655" y="223" text-anchor="middle" font-size="11" opacity=".7">auto on first resolution</text>
+          <text x="895" y="206" text-anchor="middle" font-weight="600">LLM analysis</text>
+          <text x="895" y="223" text-anchor="middle" font-size="11" opacity=".7">tools via gateway &middot; loop budget</text>
+          <text x="1130" y="206" text-anchor="middle" font-weight="600">Respond</text>
+          <text x="1130" y="223" text-anchor="middle" font-size="11" opacity=".7">stream + typed cards</text>
+          <text x="1010" y="332" text-anchor="start" font-size="11.5">any phase failure: structured error + correlation id,</text>
+          <text x="1010" y="348" text-anchor="start" font-size="11.5">never fabricated results (see F8)</text>
+          <text x="240" y="290" text-anchor="middle" font-size="10.5" opacity=".65">gates enforced in the agent runtime, in code (D1)</text>
+        </g>
+        <g fill="currentColor" class="dg-mono halo" opacity=".8">
+          <text x="235" y="150">ambiguous</text>
+          <text x="118" y="140">user answers</text>
+          <text x="440" y="272">stale / never run</text>
+          <text x="600" y="24">conversation continues &middot; same thread</text>
+          <text x="905" y="290">on failure</text>
+          <text x="655" y="356">error path</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fig-n">Figure 1</span>The turn skeleton every flow instantiates. The accented gates are deterministic code driven by hot-reloadable config; the LLM only ever runs to the right of them.</figcaption>
+  </figure>
+</section>
+
+<!-- ================================ F1 ================================ -->
+<section class="doc" id="f1">
+  <h2><span class="secnum">F1</span>First contact, happy path</h2>
+  <p><strong>Persona:</strong> app developer, one registered application. <strong>Precondition:</strong> signed in; payments-api runs in prod-east-1 and prod-east-2. The defining property: from a single vague sentence to evidence-backed answers with <em>zero</em> questions asked.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F1</span><span class="pill dim">app developer</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-user"><span class="nb">1</span><div class="b-who">You</div>Why is payments-api flaky in prod?</div>
+        <div class="b-tick"><span class="nb">2</span><span class="tk">&#10003;</span> Context resolved &middot; payments-api &middot; prod &middot; 2 clusters</div>
+        <div class="b-tick"><span class="nb">3</span><span class="tk">&#10003;</span> Health attestation &middot; prod-east-1, prod-east-2 &middot; 3.1s</div>
+        <div class="b-card"><span>Cluster attestation</span><span><span class="pill ok">healthy</span> <span class="pill crit">degraded</span></span></div>
+        <div class="b-tick"><span class="nb">4</span><span class="tk">&#10003;</span> Application 360 &middot; 31 checks &middot; 4.6s</div>
+        <div class="b-card"><span>Application 360 &middot; payments-api <span class="sub">payments-prod @ prod-east-2</span></span><span class="pill warn">at risk</span></div>
+        <div class="b-agent"><span class="nb">5</span><div class="b-who">Agent</div><strong>Summary:</strong> two overlapping causes: your pods are OOMKilled under load, and prod-east-2 is mid node-maintenance with a degraded ingress operator amplifying restarts. <strong>Next step:</strong> raise the memory limit toward 768Mi; escalation not warranted yet&hellip;</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>One vague sentence is enough; the thread id is minted here and follows every log and span. <span class="fr">NFR-OBS-2</span></span></li>
+          <li><span class="nb">2</span><span>Identity claims name the user; the registry maps them to payments-api; Prometheus discovery finds where it actually runs. No questions asked because nothing is ambiguous. <span class="fr">FR-CTX-1..3</span></span></li>
+          <li><span class="nb">3</span><span>Attestation battery runs per cluster, concurrently; the card renders from typed JSON, not prose. <span class="fr">FR-ATT-1, FR-UI-2</span></span></li>
+          <li><span class="nb">4</span><span>Application 360 runs automatically once context exists; progress streams while checks execute. <span class="fr">FR-360-1, FR-CHAT-4</span></span></li>
+          <li><span class="nb">5</span><span>Only now does the LLM speak, grounded in the check JSON; the platform-vs-app split is explicit. <span class="fr">FR-360-4, FR-CHAT-3</span></span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> question to evidence in under 10 seconds of checks plus streamed narrative; both report cards remain in the thread for <a href="#f7">drill-down (F7)</a>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F2 ================================ -->
+<section class="doc" id="f2">
+  <h2><span class="secnum">F2</span>Ambiguous context, one clarification</h2>
+  <p><strong>Persona:</strong> SRE with six registered applications. The context gate refuses to guess and refuses to interrogate: exactly one question, options enumerated, then straight into the F1 path.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F2</span><span class="pill dim">SRE &middot; 6 apps</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-user"><span class="nb">1</span><div class="b-who">You</div>Is my stuff healthy?</div>
+        <div class="b-agent"><span class="nb">2</span><div class="b-who">Agent</div>You have six registered applications. Which one first?
+          <div class="qp"><span>1 checkout</span><span>2 loyalty</span><span>3 refunds</span><span>4 catalog</span><span>5 pricing</span><span>6 audit-log</span></div>
+        </div>
+        <div class="b-user"><span class="nb">3</span><div class="b-who">You</div>checkout, prod</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Context resolved &middot; checkout &middot; prod &middot; 3 clusters</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Health attestation &middot; 3 clusters &middot; 4.2s</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Application 360 &middot; 31 checks &middot; 5.0s</div>
+        <div class="b-agent"><span class="nb">4</span><div class="b-who">Agent</div>All three prod clusters attest healthy; checkout is serving normally. One thing worth a look: p95 latency crept 12% this week&hellip;</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>&ldquo;My stuff&rdquo; resolves to six candidates; the gate stops before running a single check against the wrong scope.</span></li>
+          <li><span class="nb">2</span><span>One question per turn, options as quick-picks; this is the A2A input-required state rendered as a normal chat turn. <span class="fr">FR-CTX-4, FR-UI-5</span></span></li>
+          <li><span class="nb">3</span><span>Free text or a click both work; the answer folds into session state so the question is never re-asked this thread. <span class="fr">FR-CTX-6</span></span></li>
+          <li><span class="nb">4</span><span>From here the flow is F1; an SRE gets the same discipline, just denser evidence.</span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> ambiguity costs exactly one turn; nothing runs against a guessed scope.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F3 ================================ -->
+<section class="doc" id="f3">
+  <h2><span class="secnum">F3</span>Unregistered user, onboarding</h2>
+  <p><strong>Persona:</strong> new team member whose identity maps to no registered application. The agent explains itself instead of failing, and still helps if the user names an application (visibility beats ceremony in triage).</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F3</span><span class="pill dim">new team member</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-user"><span class="nb">1</span><div class="b-who">You</div>Why is my app slow?</div>
+        <div class="b-agent"><span class="nb">2</span><div class="b-who">Agent</div>Your account has no registered applications yet, so I cannot resolve what &ldquo;my app&rdquo; means. Your team lead can register you in the application registry (owner group mapping). If you tell me the application name, I can proceed now and note it is outside your registered set.</div>
+        <div class="b-user"><span class="nb">3</span><div class="b-who">You</div>It's inventory-sync</div>
+        <div class="b-tick"><span class="tw">&#9888;</span> Proceeding on user-named app &middot; not in your registered set</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Placement found &middot; inventory-sync &middot; nonprod-east-1</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Attestation + Application 360 &middot; 6.8s</div>
+        <div class="b-agent"><span class="nb">4</span><div class="b-who">Agent</div>inventory-sync runs in nonprod-east-1 (attests healthy). Its pods are healthy but the sync CronJob has missed 3 of its last 5 schedules&hellip;</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>No claims-to-application mapping exists; running checks blind would be noise.</span></li>
+          <li><span class="nb">2</span><span>Onboarding guidance names the fix (registry entry) and offers a working path forward. <span class="fr">FR-CTX-5</span></span></li>
+          <li><span class="nb">3</span><span>A user-named app is honored but visibly flagged; Prometheus discovery still verifies it exists before anything runs. <span class="fr">FR-CTX-2</span></span></li>
+          <li><span class="nb">4</span><span>Full triage proceeds; the registered-set caveat stays attached to the thread.</span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> a brand-new user gets value on day one and learns the registration path in the same turn. An absent or malformed identity (no claims at all) gets guidance only, with no checks executed. <span class="fr">FR-ID-4</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F4 ================================ -->
+<section class="doc" id="f4">
+  <h2><span class="secnum">F4</span>Platform-attributable incident</h2>
+  <p><strong>Persona:</strong> SRE (or any user) whose symptom is actually the platform. The attestation running first is what makes this flow cheap: the reframe arrives before any application digging, with the escalation evidence already assembled.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F4</span><span class="pill dim">SRE</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-user"><span class="nb">1</span><div class="b-who">You</div>checkout is throwing 503s in prod-west</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Context resolved &middot; checkout &middot; prod-west-4</div>
+        <div class="b-tick"><span class="nb">2</span><span class="tw">&#9888;</span> Health attestation &middot; prod-west-4 &middot; 2.9s</div>
+        <div class="b-card"><span>prod-west-4 <span class="sub">ingress operator degraded &middot; MCP worker updating 3/9 &middot; 2 nodes cordoned</span></span><span><span class="pill crit">degraded</span> <span class="pill info">maintenance</span></span></div>
+        <div class="b-agent"><span class="nb">3</span><div class="b-who">Agent</div><strong>Platform first:</strong> prod-west-4's ingress operator is degraded while worker nodes roll for maintenance; 503s at the router are expected symptoms and checkout's own pods look healthy. <strong>This is platform-attributable.</strong> Escalate to the platform team with: ingress ClusterOperator Degraded since 13:41, router pod restarts on cordoned nodes, MCP worker 3/9, and your route's 503 rate. Want me to keep checking checkout while the roll completes?</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>Explicit cluster in the question narrows scope without a clarification turn. <span class="fr">FR-CTX-7</span></span></li>
+          <li><span class="nb">2</span><span>The attestation distinguishes degraded (ingress operator) from expected maintenance (MCP rolling, cordoned nodes) instead of shouting one combined alarm. <span class="fr">FR-ATT-4</span></span></li>
+          <li><span class="nb">3</span><span>Attribution is explicit and the escalation package lists concrete evidence the platform team will want; the agent does not pretend it can fix the platform. <span class="fr">FR-CHAT-3, FR-CHAT-6</span></span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> no wasted application archaeology; the user leaves with an evidence bundle and a clear owner. Had the cluster been <span class="pill warn">unattestable</span> (Watchdog absent), the agent would have said monitoring itself cannot be trusted and capped its confidence accordingly. <span class="fr">FR-ATT-5</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F5 ================================ -->
+<section class="doc" id="f5">
+  <h2><span class="secnum">F5</span>Follow-up with stale attestation</h2>
+  <p><strong>Persona:</strong> any, later in an existing thread. The attestation gate applies to every turn, not just the first; freshness is a TTL (default 300 s), and changes are surfaced before the actual answer.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F5</span><span class="pill dim">same thread &middot; 12 min later</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-user"><span class="nb">1</span><div class="b-who">You</div>What about memory usage?</div>
+        <div class="b-tick"><span class="nb">2</span><span class="tw">&#9888;</span> Attestation stale (12 min &gt; 300 s) &middot; re-attesting 2 clusters</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Re-attested &middot; prod-east-2 recovered: ingress healthy, maintenance complete</div>
+        <div class="b-agent"><span class="nb">3</span><div class="b-who">Agent</div><strong>First, a change:</strong> prod-east-2 has recovered since we last checked; the ingress operator is healthy and the node roll is complete. On memory: payments-api p95 usage is 497Mi against a 512Mi limit; two containers were OOMKilled in the last hour. The platform recovery will not fix that headroom problem&hellip;</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>The user just asks; freshness bookkeeping is invisible until it matters.</span></li>
+          <li><span class="nb">2</span><span>TTL exceeded, so the runtime re-attests before answering; the delta (recovered!) is computed against the cached verdicts. <span class="fr">FR-ATT-7</span></span></li>
+          <li><span class="nb">3</span><span>The change leads the reply, then the actual question is answered from a fresh <span class="mono">obs__query</span>; conclusions never rest on stale platform state. <span class="fr">FR-CHAT-2</span></span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> long-running incident threads stay trustworthy; every answer stands on platform state at most TTL-old.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F6 ================================ -->
+<section class="doc" id="f6">
+  <h2><span class="secnum">F6</span>Direct cluster attestation</h2>
+  <p><strong>Persona:</strong> SRE working the platform itself. A cluster-scoped ask needs no application context; the fleet resolver turns any reasonable name into an exact cluster before anything runs.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F6</span><span class="pill dim">SRE</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-user"><span class="nb">1</span><div class="b-who">You</div>attest prod-east-2</div>
+        <div class="b-tick"><span class="nb">2</span><span class="tk">&#10003;</span> Cluster resolved &middot; prod-east-2 &middot; region us-east &middot; prod ring</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> Attestation battery &middot; 12 checks &middot; 2.7s</div>
+        <div class="b-card"><span>prod-east-2 <span class="sub">version 4.16.9 &middot; all operators available &middot; 41/41 nodes ready</span></span><span class="pill ok">healthy</span></div>
+        <div class="b-agent"><span class="nb">3</span><div class="b-who">Agent</div>prod-east-2 attests healthy. Recent changes: the 4.16.9 update completed 14:07, worker MCP settled 14:19, and the ingress operator returned to Available 13:58 after the roll. No critical alerts firing; capacity headroom is normal (CPU requests 61% of allocatable).</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>An imperative, cluster-scoped ask; the application context gate is satisfied by explicit scope. <span class="fr">FR-CTX-7</span></span></li>
+          <li><span class="nb">2</span><span>The resolver matches name, alias, label, or fuzzy text across hundreds of clusters and refuses to guess between near-matches. <span class="fr">FR-MCP-1..2</span></span></li>
+          <li><span class="nb">3</span><span>Beyond the verdict, the answer volunteers what changed recently, which is what an SRE actually opens this tool to learn.</span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> the attestation card doubles as a shareable mini status page for one cluster; &ldquo;attest checkout's clusters&rdquo; works the same way through app placement.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F7 ================================ -->
+<section class="doc" id="f7">
+  <h2><span class="secnum">F7</span>Report drill-down and export</h2>
+  <p><strong>Persona:</strong> any user holding a report card; also the path that feeds the ops manager. Cards are data, not prose: every section expands to its checks, every check to its evidence, and the whole report exports as Markdown.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Interaction &middot; F7</span><span class="pill dim">report card</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="report-card">
+          <div class="rh"><span>Application 360 &middot; payments-api <span class="sub">payments-prod @ prod-east-2</span></span><span class="pill warn">at risk</span></div>
+          <div class="sec"><span class="sn">3. Deployment overview</span><span class="pill ok">healthy</span></div>
+          <div class="sec"><span class="sn"><span class="nb">1</span> &#9662; 4. Runtime health &middot; 7 restarts, OOMKilled x2</span><span class="pill crit">failing</span></div>
+          <div class="sec-detail">
+            <span class="dhl"><span class="nb">2</span> check pod-restarts &middot; tool ocp__get_workloads &middot; 14:02:15</span>
+            <span>observed: 7 restarts / 60 min &middot; threshold: &lt;= 3 &middot; last state OOMKilled (137)</span>
+            <span>evidence: payments-api-6d9c (2 pods) &middot; runbook: <a>KubePodCrashLooping</a></span>
+          </div>
+          <div class="sec"><span class="sn">5. Configuration &middot; 2 fields awaiting input</span><span class="pill dim">manual</span></div>
+          <div class="sec"><span class="sn">12. Capacity &middot; memory limit 512Mi, p95 at 497Mi</span><span class="pill warn">warning</span></div>
+          <div class="sec"><span class="sn">13 more sections</span><span class="pill dim">expand all</span></div>
+          <div class="export-row"><span class="nb" style="align-self:center">3</span><span>Export .md</span><span>Copy evidence</span></div>
+        </div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>Collapsed rows carry name, observed value, and status pill; failing rows sit above the fold. Manual and registry-sourced items render labeled, never silently missing. <span class="fr">FR-UI-7, FR-360-6</span></span></li>
+          <li><span class="nb">2</span><span>Expanding reveals the evidence trail from the embedded check results: tool, arguments, observed vs threshold, timestamp, runbook link; no re-query needed. <span class="fr">FR-360-9</span></span></li>
+          <li><span class="nb">3</span><span>Export produces the organization's 18-section Markdown report; &ldquo;copy evidence&rdquo; grabs the expanded check's facts for a ticket or escalation. <span class="fr">FR-360-7</span></span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> the same artifact serves the developer (drill-down), the escalation (evidence copy), and the review meeting (export); nobody re-runs checks to re-read them.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ F8 ================================ -->
+<section class="doc" id="f8">
+  <h2><span class="secnum">F8</span>Failure and degraded modes</h2>
+  <p>Honesty rules the failure UX: partial results are labeled, absent trust is named, and nothing is ever invented to fill a gap. Because the check phases are deterministic code (D1), most failures degrade a report instead of killing the turn.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Failure</th><th>What the user sees</th><th>Guarantee</th></tr></thead>
+    <tbody>
+      <tr><td>One check's tool times out or errors</td><td>The battery completes; that check's row renders <span class="pill dim">error</span> with the failure reason; overall status treats it as unknown, not passed</td><td>FR-GW-6..7: structured tool errors, batteries never abort on one check</td></tr>
+      <tr><td>Cluster monitoring untrustworthy (Watchdog absent, monitoring operator degraded)</td><td>Verdict <span class="pill warn">unattestable</span>, visually distinct from degraded; the agent says platform health cannot be confirmed and caps its confidence</td><td>FR-ATT-5: absence of signal is never reported as health</td></tr>
+      <tr><td>Ollama unreachable</td><td>Attestation and Application 360 cards still arrive (they need no model); the narrative slot shows &ldquo;analysis unavailable: inference backend unreachable&rdquo; plus a correlation id</td><td>D1 dividend: deterministic value survives model outages</td></tr>
+      <tr><td>Gateway unreachable</td><td>The turn fails fast with a plain-language error and correlation id; no cards, no guesses</td><td>FR-CHAT-2: no fabricated fleet state, ever</td></tr>
+      <tr><td>Invalid config deployed by an operator</td><td>Conversations continue on the last known good battery; the operator sees the validation error (<a href="#f9">F9</a>)</td><td>FR-CFG-3: user-facing behavior never breaks on a bad edit</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout">
+    <span class="callout-tag">Error surface contract</span>
+    <p>Every user-visible failure carries a correlation id that matches one trace across all five services; stack traces and internal details never reach the console (NFR-LOG-2). The activity log shows the failing phase so the user can tell &ldquo;my question was misunderstood&rdquo; from &ldquo;the platform tooling had a bad minute&rdquo;.</p>
+  </div>
+</section>
+
+<!-- ================================ F9 ================================ -->
+<section class="doc" id="f9">
+  <h2><span class="secnum">F9</span>Operator: hot-editing the config plane</h2>
+  <p><strong>Persona:</strong> operator. The config plane is a first-class user surface: prompts, routing, skills, batteries, fleet, and gateway registry all change behavior on save, with validation guarding the swap.</p>
+  <div class="story">
+    <div class="story-head"><span class="t">Storyboard &middot; F9</span><span class="pill dim">operator &middot; editor + console</span></div>
+    <div class="story-body">
+      <div class="convo">
+        <div class="b-tick"><span class="nb">1</span><span class="tk">&#9998;</span> operator edits checks/app360.yaml &middot; adds check pdb-disruptions</div>
+        <div class="b-tick"><span class="nb">2</span><span class="tk">&#10003;</span> config.reload &middot; app360.yaml valid &middot; battery 31 &rarr; 32 checks &middot; version a41c9e2 &rarr; b52d0f3</div>
+        <div class="b-card"><span>Next report in any thread <span class="sub">section 14 now includes PDB disruptions allowed</span></span><span class="pill ok">32 checks</span></div>
+        <div class="b-tick"><span class="nb">3</span><span class="tw">&#9888;</span> operator edits health_attestation.yaml &middot; typo in a threshold</div>
+        <div class="b-tick"><span class="tw">&#9888;</span> config.reload rejected &middot; rule 7: expected number, got "3O" &middot; keeping a41c9e2</div>
+        <div class="b-tick"><span class="nb">4</span><span class="tk">&#9998;</span> operator edits agent/system_prompt.md &middot; tone adjustment</div>
+        <div class="b-tick"><span class="tk">&#10003;</span> no reload event needed &middot; next LLM call reads the new prompt</div>
+      </div>
+      <div class="notes">
+        <h4>What happened</h4>
+        <ol>
+          <li><span class="nb">1</span><span>Adding a check is YAML, not code: tool, templated args, evaluation rule, severity, runbook URL. <span class="fr">D3, FR-360-2</span></span></li>
+          <li><span class="nb">2</span><span>The watcher validates against the schema, swaps atomically, and stamps a new config version, visible in the console's left rail. <span class="fr">FR-CFG-2</span></span></li>
+          <li><span class="nb">3</span><span>A bad edit cannot take the system down: last known good stays active and the error names the exact rule. <span class="fr">FR-CFG-3</span></span></li>
+          <li><span class="nb">4</span><span>Prose prompts need no machinery at all; they are re-read on every invocation. <span class="fr">FR-CFG-2</span></span></li>
+        </ol>
+      </div>
+      <div class="outcome"><b>Outcome:</b> check tuning and prompt shaping are minute-scale config edits with a visible version stamp, satisfying acceptance criteria 5 and 6; adding a whole cloud domain is the same motion at the gateway registry (<span class="mono">servers.yaml</span>, NFR-EXT-1).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ 3 ================================ -->
+<section class="doc" id="s3">
+  <h2><span class="secnum">3</span>Flow-to-requirement coverage</h2>
+  <p>Which flows exercise which requirement groups; the PRD's acceptance criteria (section 15) map onto F1, F2, F3, and F9 directly.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Flow</th><th>Exercises</th><th>Acceptance criteria</th></tr></thead>
+    <tbody>
+      <tr><td><a href="#f1">F1</a> First contact</td><td><span class="mono">FR-CTX 1-3,6 &middot; FR-ATT 1-4,6,8 &middot; FR-360 1-5,8 &middot; FR-CHAT 2-4 &middot; FR-UI 1-3</span></td><td>#2</td></tr>
+      <tr><td><a href="#f2">F2</a> Clarification</td><td><span class="mono">FR-CTX 4,6 &middot; FR-UI 5</span></td><td>#3</td></tr>
+      <tr><td><a href="#f3">F3</a> Onboarding</td><td><span class="mono">FR-CTX 2,5 &middot; FR-ID 4</span></td><td>#4</td></tr>
+      <tr><td><a href="#f4">F4</a> Platform fault</td><td><span class="mono">FR-ATT 4-5 &middot; FR-CHAT 3,6 &middot; FR-CTX 7</span></td><td>#2 (degraded half)</td></tr>
+      <tr><td><a href="#f5">F5</a> Stale re-attest</td><td><span class="mono">FR-ATT 7 &middot; FR-CHAT 2</span></td><td>&ndash;</td></tr>
+      <tr><td><a href="#f6">F6</a> Direct attest</td><td><span class="mono">FR-MCP 1-2 &middot; FR-CTX 7 &middot; FR-ATT 8</span></td><td>&ndash;</td></tr>
+      <tr><td><a href="#f7">F7</a> Drill-down &amp; export</td><td><span class="mono">FR-UI 7 &middot; FR-360 6-7,9</span></td><td>&ndash;</td></tr>
+      <tr><td><a href="#f8">F8</a> Failure modes</td><td><span class="mono">FR-GW 6-7 &middot; FR-ATT 5 &middot; FR-CFG 3 &middot; NFR-LOG 2</span></td><td>#7 (correlation)</td></tr>
+      <tr><td><a href="#f9">F9</a> Operator config</td><td><span class="mono">FR-CFG 1-5 &middot; FR-360 2 &middot; NFR-EXT 1</span></td><td>#5, #6</td></tr>
+    </tbody>
+  </table></div>
+  <footer class="colophon">
+    <p>Companion to the <a href="https://claude.ai/code/artifact/85a2c209-c54f-4687-9965-f3e1fedf82eb">Cloud Operations Agent PRD</a> (architecture, decisions, requirements, and check catalogs; system-level sequence diagrams are PRD section 9). Source lives in the repo at <span class="mono">docs/USER-FLOWS.html</span>. Draft v0.1, 2026-08-25.</p>
+  </footer>
+</section>
+
+</main>
+</div>
