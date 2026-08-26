@@ -1,0 +1,39 @@
+# ============================================================================
+# Dev-mode identity personas.
+# The console's identity picker (dev only, FR-UI-4) lists these; the BFF
+# stamps the selected persona's claims into A2A request metadata exactly the
+# way the production JWT middleware will (same claim shape: sub, name,
+# email, groups). Swapping in real OAuth changes WHERE claims come from,
+# never their shape (decision D5).
+#
+# Groups are matched against `owner_groups` in fleet/applications.yaml to
+# derive each user's candidate applications.
+# ============================================================================
+
+version: 1
+
+users:
+  - sub: app-developer
+    name: App developer
+    email: app.developer@example.internal
+    groups: [payments-eng]
+    # -> exactly one application (payments-api): the zero-questions flow F1
+
+  - sub: team-lead
+    name: Team lead
+    email: team.lead@example.internal
+    groups: [payments-eng, retail-sre]
+    # -> many applications across two groups: exercises multi-app clarification
+
+  - sub: platform-sre
+    name: Platform SRE
+    email: platform.sre@example.internal
+    groups: [retail-sre]
+    # -> six retail applications: the one-clarifying-question flow F2,
+    #    and direct cluster attestation F6
+
+  - sub: new-joiner
+    name: New joiner
+    email: new.joiner@example.internal
+    groups: [newcomers]
+    # -> no registered applications: the onboarding flow F3

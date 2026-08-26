@@ -1,0 +1,263 @@
+# ============================================================================
+# Cluster health attestation battery.
+# Hot-reloaded: the agent validates and swaps this file on save; an invalid
+# edit keeps the last known good battery and logs the validation error.
+#
+# The deterministic orchestrator runs this battery against EVERY in-scope
+# cluster before any application-level analysis (PRD FR-ATT-1..9).
+#
+# Check schema:
+#   id        stable identifier, shown in the UI and in span attributes
+#   name      human label
+#   severity  critical | warning | info
+#             Only a FAILED check with severity `critical` marks the cluster
+#             verdict `degraded`. Warning-severity failures surface as warn
+#             rows without flipping the verdict.
+#   tool      namespaced gateway tool to call (prefix__tool)
+#   args      tool arguments; {{ cluster }} is templated per cluster.
+#             Identical (tool, args) pairs are called once per battery run
+#             and the result is shared between checks.
+#   observed  dotted path (or "a/b" pair of paths) into the tool result whose
+#             value is displayed as the check's observed reading
+#   runbook   optional runbook URL attached to the evidence
+#   rules     evaluated in order against the tool's structured result.
+#             Every triggered rule contributes an outcome; the check status
+#             is the worst triggered outcome by precedence:
+#               unattestable > fail > maintenance > warn
+#             and `pass` when no rule triggers.
+#     path      dotted path into the result (lists supported by index)
+#     op        eq|ne|gt|gte|lt|lte|in|not_in|empty|not_empty|truthy|falsy|
+#               exists|absent
+#     value     comparison operand (omit for empty/truthy/exists style ops)
+#     outcome   fail | warn | maintenance | unattestable
+#     reason    short human explanation used in the evidence trail
+#
+# Cluster verdict derivation (engine, PRD 10.1):
+#   any unattestable outcome        -> unattestable
+#   else any critical-severity fail -> degraded
+#   else any maintenance outcome    -> maintenance
+#   else                            -> healthy
+# ============================================================================
+
+version: 1
+battery: health_attestation
+scope: cluster
+defaults:
+  timeout_seconds: 20
+
+checks:
+  - id: api-reachability
+    name: API reachability
+    severity: critical
+    tool: ocp__get_cluster_info
+    args: { cluster: "{{ cluster }}" }
+    observed: latency_ms
+    rules:
+      - path: reachable
+        op: falsy
+        outcome: fail
+        reason: cluster API did not respond
+
+  - id: cluster-version
+    name: ClusterVersion
+    severity: critical
+    tool: ocp__get_cluster_version
+    args: { cluster: "{{ cluster }}" }
+    observed: version
+    runbook: https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/updating_clusters/performing-a-cluster-update
+    rules:
+      - path: failing
+        op: truthy
+        outcome: fail
+        reason: ClusterVersion Failing=True; the cluster cannot reach its desired state
+      - path: available
+        op: falsy
+        outcome: fail
+        reason: ClusterVersion Available=False
+      - path: progressing
+        op: truthy
+        outcome: maintenance
+        reason: cluster update in progress (Progressing=True)
+
+  - id: cluster-operators
+    name: ClusterOperators
+    severity: critical
+    tool: ocp__get_cluster_operators
+    args: { cluster: "{{ cluster }}" }
+    observed: available_count/total
+    runbook: https://github.com/openshift/enhancements/blob/master/dev-guide/cluster-version-operator/dev/clusteroperator.md
+    rules:
+      - path: critical_degraded
+        op: not_empty
+        outcome: fail
+        reason: a critical cluster operator (etcd, kube-apiserver, ingress, dns, authentication, monitoring, ...) is Degraded
+      - path: degraded
+        op: not_empty
+        outcome: warn
+        reason: a non-critical cluster operator is Degraded
+      - path: unavailable
+        op: not_empty
+        outcome: fail
+        reason: a cluster operator is Available=False
+
+  - id: nodes
+    name: Nodes
+    severity: critical
+    tool: ocp__get_nodes
+    args: { cluster: "{{ cluster }}" }
+    observed: ready/total
+    runbook: https://monitoring.mixins.dev/kubernetes/
+    rules:
+      - path: not_ready
+        op: not_empty
+        outcome: fail
+        reason: nodes NotReady (cordoned nodes excluded, mirroring KubeNodeNotReady)
+      - path: pressure
+        op: not_empty
+        outcome: warn
+        reason: nodes reporting memory/disk/PID pressure
+      - path: cordoned
+        op: not_empty
+        outcome: maintenance
+        reason: nodes cordoned for maintenance or rollout
+
+  - id: machine-config-pools
+    name: MachineConfigPools
+    severity: critical
+    tool: ocp__get_machine_config_pools
+    args: { cluster: "{{ cluster }}" }
+    observed: summary
+    runbook: https://access.redhat.com/solutions/5244121
+    rules:
+      - path: any_degraded
+        op: truthy
+        outcome: fail
+        reason: a MachineConfigPool is Degraded; node rollouts are stalled and need intervention
+      - path: any_updating
+        op: truthy
+        outcome: maintenance
+        reason: a MachineConfigPool is Updating; nodes are being drained and rebooted
+      - path: any_paused
+        op: truthy
+        outcome: warn
+        reason: a MachineConfigPool is paused; long pauses block cert rotation and upgrades
+
+  - id: etcd
+    name: etcd
+    severity: critical
+    tool: obs__get_etcd_health
+    args: { cluster: "{{ cluster }}" }
+    observed: members_up/members_expected
+    runbook: https://github.com/openshift/runbooks/blob/master/alerts/cluster-etcd-operator/etcdNoLeader.md
+    rules:
+      - path: has_leader
+        op: falsy
+        outcome: fail
+        reason: etcd has no leader; the control plane cannot serve reads or writes
+      - path: quorum
+        op: falsy
+        outcome: fail
+        reason: etcd quorum lost or members down
+      - path: fsync_p99_ms
+        op: gt
+        value: 10
+        outcome: warn
+        reason: etcd WAL fsync p99 above 10ms; slow disk degrades the whole control plane
+
+  - id: firing-alerts
+    name: Firing alerts
+    severity: critical
+    tool: obs__get_firing_alerts
+    args: { cluster: "{{ cluster }}" }
+    observed: summary
+    runbook: https://runbooks.prometheus-operator.dev/
+    rules:
+      - path: critical
+        op: not_empty
+        outcome: fail
+        reason: critical alerts firing (Watchdog excluded)
+      - path: warning
+        op: not_empty
+        outcome: warn
+        reason: warning alerts firing
+
+  - id: watchdog-present
+    name: Watchdog present
+    severity: critical
+    tool: obs__get_firing_alerts
+    args: { cluster: "{{ cluster }}" }
+    observed: watchdog_present
+    runbook: https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/
+    rules:
+      - path: watchdog_present
+        op: falsy
+        outcome: unattestable
+        reason: the Watchdog dead man's switch is not firing; the monitoring pipeline itself cannot be trusted
+      - path: monitoring_healthy
+        op: falsy
+        outcome: unattestable
+        reason: the monitoring stack reports unhealthy; cluster signals may be stale
+
+  - id: apiserver-slo
+    name: API server SLO
+    severity: warning
+    tool: obs__get_apiserver_slo
+    args: { cluster: "{{ cluster }}" }
+    observed: error_rate_5xx
+    runbook: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/KubeAPIErrorBudgetBurn.md
+    rules:
+      - path: error_rate_5xx
+        op: gt
+        value: 0.05
+        outcome: fail
+        reason: API server 5xx error rate above 5 percent
+      - path: error_rate_5xx
+        op: gt
+        value: 0.01
+        outcome: warn
+        reason: API server 5xx error rate above 1 percent
+
+  - id: capacity
+    name: Capacity headroom
+    severity: warning
+    tool: obs__get_capacity_summary
+    args: { cluster: "{{ cluster }}" }
+    observed: summary
+    runbook: https://monitoring.mixins.dev/kubernetes/#kubecpuovercommit
+    rules:
+      - path: fits_minus_one_node
+        op: falsy
+        outcome: warn
+        reason: resource requests no longer fit allocatable capacity minus one node (overcommit guard)
+      - path: pod_ratio
+        op: gt
+        value: 0.95
+        outcome: warn
+        reason: pod count above 95 percent of cluster pod capacity
+
+  - id: pending-csrs
+    name: Pending CSRs
+    severity: warning
+    tool: ocp__get_pending_csrs
+    args: { cluster: "{{ cluster }}" }
+    observed: pending_count
+    runbook: https://access.redhat.com/solutions/5044281
+    rules:
+      - path: pending_count
+        op: gt
+        value: 0
+        outcome: warn
+        reason: unapproved certificate signing requests; stale CSRs eventually drive nodes NotReady
+
+  - id: cert-expiry
+    name: Certificate expiry signals
+    severity: warning
+    tool: obs__get_firing_alerts
+    args: { cluster: "{{ cluster }}" }
+    observed: cert_expiry_alerts
+    runbook: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeclientcertificateexpiration/
+    rules:
+      - path: cert_expiry_alerts
+        op: not_empty
+        outcome: warn
+        reason: certificate expiration alerts are firing

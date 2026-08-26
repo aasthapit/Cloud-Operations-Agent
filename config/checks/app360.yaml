@@ -1,0 +1,449 @@
+# ============================================================================
+# Application 360 battery.
+# Hot-reloaded like health_attestation.yaml (validate, atomic swap, last
+# known good on error).
+#
+# The battery is organized by the organization's 18-section Application 360
+# report template (docs/reference/source-checklists.md). The engine runs it
+# once per application instance (cluster, namespace) after context resolves
+# (PRD FR-360-1..9).
+#
+# Section schema:
+#   section   1..18, template section number
+#   title     template section title
+#   source    checks    - deterministic tool checks below populate the section
+#             registry  - facts come from the application registry entry
+#             narrative - the LLM authors this section, grounded in all
+#                         check results (it MUST NOT invent facts)
+#             attestation - the section reuses the host cluster's attestation
+#   checks    same schema as health_attestation.yaml, plus these template
+#             variables: {{ cluster }} {{ namespace }} {{ app_label }}
+#             {{ application }} {{ environment }}
+#   registry_fields  dotted paths into the app registry entry to render
+#   manual_items     facts the MVP cannot source; rendered as `manual` rows
+#                    so nothing silently disappears (FR-360-6)
+#
+# Report status mapping (engine, FR-360-5): any failed critical check ->
+# critical; any failed or warning check -> at_risk; otherwise healthy.
+# ============================================================================
+
+version: 1
+battery: app360
+scope: app_instance
+defaults:
+  timeout_seconds: 20
+
+sections:
+  - section: 1
+    title: Executive summary
+    source: narrative
+
+  - section: 2
+    title: Application identity
+    source: registry
+    registry_fields:
+      - application
+      - owners.business
+      - owners.technical
+      - owners.support_team
+      - criticality
+      - sla
+      - slo
+
+  - section: 3
+    title: Deployment overview
+    source: checks
+    checks:
+      - id: workload-availability
+        name: Workload availability
+        severity: critical
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: replicas_summary
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubedeploymentreplicasmismatch
+        rules:
+          - path: replicas_mismatch
+            op: not_empty
+            outcome: fail
+            reason: ready replicas below desired outside of an in-progress rollout
+      - id: rollout-status
+        name: Rollout status
+        severity: warning
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: rollout_summary
+        rules:
+          - path: failed_rollouts
+            op: not_empty
+            outcome: fail
+            reason: a rollout has failed revisions
+          - path: rollouts_in_progress
+            op: not_empty
+            outcome: maintenance
+            reason: a rollout is currently progressing
+
+  - section: 4
+    title: Runtime health
+    source: checks
+    checks:
+      - id: crashloops
+        name: CrashLoopBackOff pods
+        severity: critical
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pods.crashloop
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubepodcrashlooping
+        rules:
+          - path: pods.crashloop
+            op: not_empty
+            outcome: fail
+            reason: pods stuck in CrashLoopBackOff
+      - id: image-pull-errors
+        name: Image pull errors
+        severity: critical
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pods.image_pull_errors
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubecontainerwaiting
+        rules:
+          - path: pods.image_pull_errors
+            op: not_empty
+            outcome: fail
+            reason: pods failing to pull their image
+      - id: pod-restarts
+        name: Restart churn
+        severity: critical
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pods.restarts_last_hour
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubepodcrashlooping
+        rules:
+          - path: pods.restarts_last_hour
+            op: gt
+            value: 3
+            outcome: fail
+            reason: more than 3 container restarts in the last hour
+      - id: oomkills
+        name: OOM kills
+        severity: warning
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pods.oomkilled_recent
+        rules:
+          - path: pods.oomkilled_recent
+            op: not_empty
+            outcome: warn
+            reason: containers OOMKilled recently (pair with restart churn to judge severity)
+      - id: pending-pods
+        name: Pending pods
+        severity: warning
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pods.pending
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubepodnotready
+        rules:
+          - path: pods.pending
+            op: not_empty
+            outcome: warn
+            reason: pods pending or unschedulable (Jobs excluded, mirroring KubePodNotReady)
+      - id: probe-failures
+        name: Probe failures
+        severity: warning
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pods.probes_failing
+        rules:
+          - path: pods.probes_failing
+            op: not_empty
+            outcome: warn
+            reason: readiness or liveness probes failing
+
+  - section: 5
+    title: Configuration
+    source: checks
+    checks:
+      - id: config-references
+        name: Config references
+        severity: info
+        tool: ocp__get_configuration
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: summary
+        rules: []
+    manual_items:
+      - Check for config drift across environments
+      - Validate secret rotation status
+
+  - section: 6
+    title: Networking and connectivity
+    source: checks
+    checks:
+      - id: route-tls
+        name: Route TLS certificates
+        severity: warning
+        tool: ocp__get_network
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: routes_summary
+        rules:
+          - path: expiring_certs
+            op: not_empty
+            outcome: warn
+            reason: route TLS certificates expiring within 30 days
+      - id: dns-connectivity
+        name: DNS and connectivity
+        severity: warning
+        tool: ocp__get_network
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: dns_healthy
+        rules:
+          - path: dns_healthy
+            op: falsy
+            outcome: warn
+            reason: in-cluster DNS resolution reported unhealthy
+    manual_items:
+      - Validate external endpoint connectivity
+      - Check firewall or egress restrictions
+
+  - section: 7
+    title: Storage and data
+    source: checks
+    checks:
+      - id: pvc-binding
+        name: PVC binding
+        severity: critical
+        tool: ocp__get_pvcs
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: summary
+        rules:
+          - path: unbound
+            op: not_empty
+            outcome: fail
+            reason: PersistentVolumeClaims not bound
+      - id: pvc-capacity
+        name: PVC capacity
+        severity: warning
+        tool: ocp__get_pvcs
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: summary
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubepersistentvolumefillingup
+        rules:
+          - path: near_full
+            op: not_empty
+            outcome: warn
+            reason: volumes above 90 percent usage or predicted full within 4 days
+    registry_fields:
+      - backup.policy
+
+  - section: 8
+    title: Security posture
+    source: checks
+    checks:
+      - id: workload-identity
+        name: ServiceAccount and pod security
+        severity: info
+        tool: ocp__get_security_posture
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: summary
+        rules:
+          - path: psa_compliant
+            op: falsy
+            outcome: warn
+            reason: pod security admission reports the workload non-compliant
+    manual_items:
+      - Review image vulnerability status
+      - Review least-privilege access posture
+
+  - section: 9
+    title: Observability
+    source: checks
+    checks:
+      - id: app-alerts
+        name: Firing application alerts
+        severity: critical
+        tool: obs__get_firing_alerts
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}" }
+        observed: summary
+        rules:
+          - path: critical
+            op: not_empty
+            outcome: fail
+            reason: critical alerts firing in the application namespace
+          - path: warning
+            op: not_empty
+            outcome: warn
+            reason: warning alerts firing in the application namespace
+      - id: error-rate
+        name: Error rate
+        severity: critical
+        tool: obs__get_golden_signals
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: error_rate
+        rules:
+          - path: error_rate
+            op: gt
+            value: 0.05
+            outcome: fail
+            reason: request error rate above 5 percent
+          - path: error_rate
+            op: gt
+            value: 0.01
+            outcome: warn
+            reason: request error rate above 1 percent
+      - id: latency
+        name: Latency p95
+        severity: warning
+        tool: obs__get_golden_signals
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: p95_latency_ms
+        rules:
+          - path: latency_breach
+            op: truthy
+            outcome: warn
+            reason: p95 latency above the application's SLO target
+
+  - section: 10
+    title: Dependency health
+    source: registry
+    registry_fields:
+      - dependencies
+    manual_items:
+      - Review message queue depth and third-party API health
+
+  - section: 11
+    title: Cluster and platform context
+    source: attestation
+    checks:
+      - id: namespace-quota
+        name: Namespace quota
+        severity: warning
+        tool: ocp__get_quotas
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}" }
+        observed: summary
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubequotaalmostfull
+        rules:
+          - path: near_limit
+            op: not_empty
+            outcome: warn
+            reason: resource quota above 90 percent used
+
+  - section: 12
+    title: Capacity and performance
+    source: checks
+    checks:
+      - id: memory-headroom
+        name: Memory headroom
+        severity: critical
+        tool: obs__get_workload_usage
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: memory_summary
+        rules:
+          - path: memory.usage_ratio_of_limit
+            op: gt
+            value: 0.97
+            outcome: fail
+            reason: p95 memory usage within 3 percent of the limit; OOM kills imminent
+          - path: memory.usage_ratio_of_limit
+            op: gt
+            value: 0.9
+            outcome: warn
+            reason: p95 memory usage above 90 percent of the limit
+      - id: cpu-throttling
+        name: CPU throttling
+        severity: warning
+        tool: obs__get_workload_usage
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: throttling_ratio
+        runbook: https://monitoring.mixins.dev/kubernetes/#cputhrottlinghigh
+        rules:
+          - path: throttling_ratio
+            op: gt
+            value: 0.25
+            outcome: warn
+            reason: over 25 percent of CPU periods throttled (CPUThrottlingHigh threshold)
+      - id: hpa-maxed
+        name: HPA at max replicas
+        severity: warning
+        tool: obs__get_workload_usage
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: hpa_summary
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubehpamaxedout
+        rules:
+          - path: hpa.maxed_out
+            op: truthy
+            outcome: warn
+            reason: HPA pinned at max replicas (min==max excluded, mirroring KubeHpaMaxedOut)
+
+  - section: 13
+    title: Release and change history
+    source: checks
+    checks:
+      - id: release-history
+        name: Recent rollouts
+        severity: info
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: release_summary
+        rules:
+          - path: failed_rollouts
+            op: not_empty
+            outcome: warn
+            reason: failed revisions in recent rollout history
+    manual_items:
+      - Review change tickets and deployment approvals
+
+  - section: 14
+    title: Reliability and recovery
+    source: checks
+    checks:
+      - id: pdb-disruptions
+        name: PDB disruption budget
+        severity: warning
+        tool: obs__get_workload_usage
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: pdb_summary
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubepdbnotenoughhealthypods
+        rules:
+          - path: pdb.blocked
+            op: truthy
+            outcome: warn
+            reason: zero disruptions allowed; node drains (maintenance) will block on this app
+      - id: single-replica
+        name: Single points of failure
+        severity: warning
+        tool: ocp__get_workloads
+        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
+        observed: replicas_summary
+        rules:
+          - path: single_replica_workloads
+            op: not_empty
+            outcome: warn
+            reason: production workloads running a single replica
+    registry_fields:
+      - backup.rpo
+      - backup.rto
+      - backup.policy
+
+  - section: 15
+    title: Operational risks and gaps
+    source: narrative
+    manual_items:
+      - List deprecated versions and unsupported components
+      - List manual operational steps and missing documentation
+
+  - section: 16
+    title: Supportability and ownership
+    source: registry
+    registry_fields:
+      - owners.support_team
+      - on_call
+      - escalation
+      - runbook_url
+      - monitoring_owner
+      - docs_status
+
+  - section: 17
+    title: Recommendations
+    source: narrative
+
+  - section: 18
+    title: Final assessment
+    source: narrative

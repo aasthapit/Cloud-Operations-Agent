@@ -6,10 +6,17 @@
 # ============================================================================
 
 inference:
-  # Only "ollama" is wired today. The agent talks to Ollama through LiteLLM,
-  # so adding hosted providers later is a one-line change in the agent's
-  # model factory plus a new provider block here.
-  provider: ollama
+  # How the agent reaches the model through LiteLLM. Two styles are wired:
+  #
+  #   openai-compat (default): treats the local Ollama server as a mock
+  #     OpenAI endpoint (Ollama natively serves the OpenAI chat API at
+  #     <OLLAMA_API_BASE>/v1). This is the same code path a hosted
+  #     OpenAI-compatible gateway would use in production, so swapping in a
+  #     real endpoint later is an env var change, not a code change.
+  #   ollama-chat: LiteLLM's native ollama_chat provider. Fall back to this
+  #     if a model misbehaves in tool loops over the OpenAI-compat surface
+  #     (ADK docs note ollama_chat has the most battle-tested tool calling).
+  provider: openai-compat
 
   # Model served by the local Ollama instance. Must support tool calling.
   # Known-good options installed on this machine:

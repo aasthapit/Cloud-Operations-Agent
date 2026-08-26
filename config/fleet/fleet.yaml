@@ -1,0 +1,91 @@
+# ============================================================================
+# Fleet registry: every cluster the agent can resolve and talk about.
+# Hot-reloaded by the OpenShift MCP server (fleet resolver) on save.
+#
+# Two kinds of entries:
+#   clusters:   explicitly described clusters (the interesting ones; in live
+#               mode each carries its API and Prometheus endpoints)
+#   synthetic:  a deterministic generator that fills the registry out to
+#               fleet scale (hundreds of clusters) so resolver paging,
+#               fuzzy matching, and fleet-wide queries are exercised
+#               honestly in mock mode. Synthetic clusters are always
+#               healthy; faults are only ever scripted in mock/scenario.yaml
+#               against explicit clusters.
+#
+# In live mode `api_url` must point at the real cluster API and credentials
+# come from the environment (CLOUDOPS_OCP_TOKEN / KUBECONFIG), never from
+# this committed file.
+# ============================================================================
+
+version: 1
+
+clusters:
+  - name: prod-east-1
+    aliases: [pe1, prod-east-primary]
+    environment: prod
+    region: us-east
+    ring: prod
+    version: 4.16.9
+    api_url: https://api.prod-east-1.example.internal:6443
+    console_url: https://console.prod-east-1.example.internal
+    labels: { tier: payments, criticality: high }
+
+  - name: prod-east-2
+    aliases: [pe2]
+    environment: prod
+    region: us-east
+    ring: prod
+    version: 4.16.9
+    api_url: https://api.prod-east-2.example.internal:6443
+    console_url: https://console.prod-east-2.example.internal
+    labels: { tier: payments, criticality: high }
+
+  - name: prod-west-4
+    aliases: [pw4]
+    environment: prod
+    region: us-west
+    ring: prod
+    version: 4.16.8
+    api_url: https://api.prod-west-4.example.internal:6443
+    console_url: https://console.prod-west-4.example.internal
+    labels: { tier: retail, criticality: high }
+
+  - name: prod-eu-1
+    aliases: [eu1]
+    environment: prod
+    region: eu-central
+    ring: prod
+    version: 4.16.9
+    api_url: https://api.prod-eu-1.example.internal:6443
+    console_url: https://console.prod-eu-1.example.internal
+    labels: { tier: retail, criticality: medium }
+
+  - name: nonprod-east-1
+    aliases: [ne1, dev-east]
+    environment: nonprod
+    region: us-east
+    ring: nonprod
+    version: 4.16.9
+    api_url: https://api.nonprod-east-1.example.internal:6443
+    console_url: https://console.nonprod-east-1.example.internal
+    labels: { tier: shared, criticality: low }
+
+  - name: nonprod-west-2
+    aliases: [nw2]
+    environment: nonprod
+    region: us-west
+    ring: nonprod
+    version: 4.16.9
+    api_url: https://api.nonprod-west-2.example.internal:6443
+    console_url: https://console.nonprod-west-2.example.internal
+    labels: { tier: shared, criticality: low }
+
+# Deterministic filler so the registry behaves like a real fleet of hundreds.
+# Names look like ocp-<env>-<region>-<nn>, e.g. ocp-prod-us-east-17.
+synthetic:
+  count: 174
+  seed: 20260825
+  name_prefix: ocp
+  environments: [prod, nonprod]
+  regions: [us-east, us-west, eu-central, ap-south]
+  version: 4.16.9

@@ -1,0 +1,65 @@
+# ============================================================================
+# MCP gateway server registry.
+# Hot-reloaded: adding, enabling, or disabling a server converges without a
+# gateway restart (FR-GW-4). Adding a whole new cloud domain is exactly one
+# entry here plus optional checks and a skill file (NFR-EXT-1).
+#
+# Fields:
+#   prefix         tool namespace: downstream tool `foo` is exposed as
+#                  `<prefix>__foo` with its schema passed through verbatim
+#   url            downstream MCP streamable-HTTP endpoint. ${VAR:default}
+#                  interpolation is supported.
+#   enabled        disabled servers are disconnected and their tools removed
+#   timeout_seconds  per-call ceiling; the gateway cancels and reports
+#                  slower calls (FR-GW-7)
+#   allow_tools    explicit allowlist of downstream tool names; anything not
+#                  listed is refused and never advertised (FR-GW-3,
+#                  NFR-SEC-3)
+#
+# deny_tools is a global denylist applied after every allowlist (belt and
+# braces for org-wide bans).
+# ============================================================================
+
+version: 1
+
+servers:
+  - prefix: ocp
+    name: OpenShift MCP
+    url: "http://localhost:${CLOUDOPS_MCP_OPENSHIFT_PORT:8011}/mcp"
+    enabled: true
+    timeout_seconds: 30
+    allow_tools:
+      - resolve_cluster
+      - list_clusters
+      - get_cluster_info
+      - get_cluster_version
+      - get_cluster_operators
+      - get_nodes
+      - get_machine_config_pools
+      - get_pending_csrs
+      - get_workloads
+      - get_events
+      - get_quotas
+      - get_network
+      - get_pvcs
+      - get_configuration
+      - get_security_posture
+      - get_app_registry_entry
+
+  - prefix: obs
+    name: Observability MCP
+    url: "http://localhost:${CLOUDOPS_MCP_OBSERVABILITY_PORT:8012}/mcp"
+    enabled: true
+    timeout_seconds: 30
+    allow_tools:
+      - query_instant
+      - find_app_placements
+      - get_firing_alerts
+      - get_etcd_health
+      - get_apiserver_slo
+      - get_capacity_summary
+      - get_golden_signals
+      - get_workload_usage
+      - get_dashboard_links
+
+deny_tools: []
