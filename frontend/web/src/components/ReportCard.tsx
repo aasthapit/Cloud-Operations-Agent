@@ -18,7 +18,10 @@ function Evidence(props: { check: CheckResult }) {
       <span>args: {JSON.stringify(ev.args)}</span>
       {ev.triggered_rules.map((rule, i) => (
         <span key={i}>
-          observed {JSON.stringify(rule.observed)} vs {rule.op} {JSON.stringify(rule.value)} - {rule.outcome}: {rule.reason}
+          {/* value-less ops (not_empty, is_true...) read badly as "vs op null" */}
+          observed {rule.path} = {JSON.stringify(rule.observed)}{" "}
+          {rule.value == null ? `(rule: ${rule.op})` : `vs ${rule.op} ${JSON.stringify(rule.value)}`}{" "}
+          - {rule.outcome}: {rule.reason}
         </span>
       ))}
       {ev.error && <span>error: {ev.error}</span>}
