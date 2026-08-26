@@ -298,7 +298,8 @@
     font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 76ch;
   }
   figcaption .fig-n { font-family: "IBM Plex Mono", ui-monospace, monospace; color: var(--gold); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; margin-right: 6px; }
-  pre.mermaid { background: transparent; margin: 0; display: flex; justify-content: center; }
+  /* Knockout stroke so diagram labels stay legible where they cross lifelines. */
+  .halo { paint-order: stroke; stroke: var(--surface); stroke-width: 3.5px; stroke-linejoin: round; }
 
   /* diagram text */
   .dg { font-family: "IBM Plex Sans", Arial, sans-serif; font-size: 12.5px; }
@@ -381,6 +382,12 @@
   .report-card .sec { display: flex; justify-content: space-between; gap: 8px; padding: 4.5px 11px; border-bottom: 1px solid var(--line); }
   .report-card .sec:last-child { border-bottom: none; }
   .report-card .sec .sn { color: var(--muted); }
+  .report-card .sec-detail {
+    background: var(--code-bg); border-bottom: 1px solid var(--line);
+    padding: 6px 11px 7px 24px; display: flex; flex-direction: column; gap: 2px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; color: var(--muted);
+  }
+  .report-card .sec-detail .dhl { color: var(--ink); }
   .mock-input { display: flex; gap: 8px; border-top: 1px solid var(--line); padding: 9px 11px; background: var(--surface); }
   .mock-input .field {
     flex: 1; border: 1px solid var(--line-strong); border-radius: 5px; color: var(--faint);
@@ -506,6 +513,7 @@
     <li>A <strong>Detailed Operations Checklist</strong> covering 15 categories from application identity through supportability and readiness.</li>
     <li>An <strong>OpenShift Application 360 Report Template</strong> with 18 sections: an executive summary, per-section fact tables, findings notes, recommendations, and a final assessment.</li>
   </ul>
+  <p>Both artifacts are transcribed verbatim from the supplied document photos, with a per-item accounting of how the MVP covers each of the 161 checklist items, in <code>docs/reference/source-checklists.md</code> (rollup in <a href="#s10">&sect;10.3</a>).</p>
   <p>The existing &ldquo;Platform Management&rdquo; agentic console establishes the UI language this product follows: a deep red masthead, a light card-grid dashboard (incidents, alerts, changes, observability, dependency map), an embedded AI Assistant chat, and a dark log explorer. This product adopts that visual language as themeable design tokens without depending on that platform (&sect;14).</p>
   <p>Industry practice grounds the health attestation design: Red Hat's own troubleshooting order (ClusterVersion, ClusterOperators, nodes, MachineConfigPools, etcd, alerts), kubernetes-mixin alert rules with their hard-won false-positive guards, the Watchdog dead-man's-switch convention, and Google SRE's &ldquo;platform or app&rdquo; triage fork. Section <a href="#s10">10</a> carries the full catalog with sources.</p>
 </section>
@@ -846,6 +854,7 @@
     <div class="req"><div class="rid">FR-360-6</div><div class="rtx">Sections whose data source is not yet automated <span class="kw">MUST</span> render as <code>manual</code> or <code>registry</code> sourced rather than silently disappearing.</div></div>
     <div class="req"><div class="rid">FR-360-7</div><div class="rtx">The report <span class="kw">MUST</span> be exportable (Markdown download in MVP).</div></div>
     <div class="req"><div class="rid">FR-360-8</div><div class="rtx">When the application runs in multiple in-scope instances (cluster, namespace pairs), the report <span class="kw">MUST</span> cover each instance or state which instance it covers.</div></div>
+    <div class="req"><div class="rid">FR-360-9</div><div class="rtx">The report artifact <span class="kw">MUST</span> embed the underlying per-check results (id, section, status, observed value, threshold, evidence, runbook URL) so clients can render check-level drill-down without re-querying.</div></div>
   </div>
 
   <h3>7.4 Conversation and analysis (FR-CHAT)</h3>
@@ -897,6 +906,7 @@
     <div class="req"><div class="rid">FR-UI-4</div><div class="rtx">The dev identity picker <span class="kw">MUST</span> be visible only in dev mode.</div></div>
     <div class="req"><div class="rid">FR-UI-5</div><div class="rtx">Clarification requests (A2A <code>input-required</code>) <span class="kw">MUST</span> render as normal chat turns with quick-pick options.</div></div>
     <div class="req"><div class="rid">FR-UI-6</div><div class="rtx">The UI <span class="kw">MUST</span> remain a thin client: no triage logic, no direct MCP access.</div></div>
+    <div class="req"><div class="rid">FR-UI-7</div><div class="rtx">Report cards <span class="kw">MUST</span> render per-check status rows (<span class="pill ok">healthy</span> <span class="pill warn">warning</span> <span class="pill crit">failing</span> <span class="pill info">maintenance</span> <span class="pill dim">manual / registry</span>) that expand in place to show the check's evidence: tool called, arguments, observed value versus threshold, timestamp, and runbook link.</div></div>
   </div>
 
   <h3>7.9 Identity (FR-ID)</h3>
@@ -967,63 +977,161 @@
   <h3>9.1 First-contact triage</h3>
   <figure>
     <div class="figure-panel">
-      <pre class="mermaid">
-sequenceDiagram
-  autonumber
-  actor U as App developer
-  participant C as Console SPA
-  participant B as BFF
-  participant A as Agent (ADK/A2A)
-  participant G as MCP Gateway
-  participant O as OpenShift MCP
-  participant P as Observability MCP
-  participant L as Ollama
-
-  U->>C: "Why is payments-api flaky in prod?"
-  C->>B: POST /api/chat/stream
-  B->>A: A2A SendStreamingMessage (claims in metadata, contextId)
-  A-->>B: status working: "Resolving context"
-  A->>G: ocp__get_app_registry_entry
-  G->>O: get_app_registry_entry
-  A->>G: obs__find_app_placements
-  G->>P: find_app_placements
-  Note over A: Context: payments-api, prod,<br/>clusters prod-east-1 + prod-east-2
-  A-->>B: status working: "Attesting 2 clusters"
-  loop per cluster, checks concurrent
-    A->>G: ocp__get_cluster_version / operators / nodes / mcpools
-    A->>G: obs__get_firing_alerts / capacity
-  end
-  A-->>B: artifact: attestation_report (JSON)
-  A-->>B: status working: "Running Application 360"
-  loop app360 battery
-    A->>G: ocp__get_workloads / events / quotas, obs__golden_signals
-  end
-  A-->>B: artifact: app360_report (JSON)
-  A->>L: narrative synthesis grounded in check JSON
-  L-->>A: streamed tokens
-  A-->>B: streamed message + final status
-  B-->>C: normalized SSE (status, cards, tokens)
-  C-->>U: attestation card, App 360 card, narrative
-      </pre>
+      <svg viewBox="0 0 1240 880" role="img" aria-label="Sequence diagram of first-contact triage: the user's question flows through the console and BFF to the agent over A2A; the agent resolves context, attests both clusters, and runs the Application 360 battery through the gateway before the LLM synthesizes the narrative via Ollama" style="min-width:1000px">
+        <defs>
+          <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        <!-- lifelines -->
+        <g stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".3">
+          <line x1="70" y1="52" x2="70" y2="860"/>
+          <line x1="205" y1="52" x2="205" y2="860"/>
+          <line x1="340" y1="52" x2="340" y2="860"/>
+          <line x1="505" y1="52" x2="505" y2="860"/>
+          <line x1="675" y1="52" x2="675" y2="860"/>
+          <line x1="825" y1="52" x2="825" y2="860"/>
+          <line x1="985" y1="52" x2="985" y2="860"/>
+          <line x1="1140" y1="52" x2="1140" y2="860"/>
+        </g>
+        <!-- participant headers -->
+        <g fill="var(--surface2)" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2">
+          <rect x="15" y="18" width="110" height="34" rx="4"/>
+          <rect x="150" y="18" width="110" height="34" rx="4"/>
+          <rect x="295" y="18" width="90" height="34" rx="4"/>
+          <rect x="430" y="18" width="150" height="34" rx="4"/>
+          <rect x="615" y="18" width="120" height="34" rx="4"/>
+          <rect x="760" y="18" width="130" height="34" rx="4"/>
+          <rect x="915" y="18" width="140" height="34" rx="4"/>
+          <rect x="1095" y="18" width="90" height="34" rx="4"/>
+        </g>
+        <g fill="currentColor" class="dg" font-weight="600" text-anchor="middle">
+          <text x="70" y="40">App developer</text>
+          <text x="205" y="40">Console SPA</text>
+          <text x="340" y="40">BFF</text>
+          <text x="505" y="40">Agent &middot; ADK/A2A</text>
+          <text x="675" y="40">MCP Gateway</text>
+          <text x="825" y="40">OpenShift MCP</text>
+          <text x="985" y="40">Observability MCP</text>
+          <text x="1140" y="40">Ollama</text>
+        </g>
+        <!-- context note -->
+        <rect x="400" y="314" width="430" height="36" rx="4" fill="var(--neutral-bg)" stroke="currentColor" stroke-opacity=".3"/>
+        <!-- loop frames -->
+        <g fill="none" stroke="currentColor" stroke-width="1.1" stroke-dasharray="5 4" opacity=".5">
+          <rect x="445" y="404" width="380" height="100" rx="4"/>
+          <rect x="445" y="586" width="380" height="76" rx="4"/>
+        </g>
+        <!-- solid request arrows -->
+        <g stroke="currentColor" stroke-width="1.3">
+          <line x1="70" y1="86" x2="203" y2="86" marker-end="url(#arr4)"/>
+          <line x1="205" y1="116" x2="338" y2="116" marker-end="url(#arr4)"/>
+          <line x1="340" y1="146" x2="503" y2="146" marker-end="url(#arr4)"/>
+          <line x1="505" y1="206" x2="673" y2="206" marker-end="url(#arr4)"/>
+          <line x1="675" y1="236" x2="823" y2="236" marker-end="url(#arr4)"/>
+          <line x1="505" y1="266" x2="673" y2="266" marker-end="url(#arr4)"/>
+          <line x1="675" y1="296" x2="983" y2="296" marker-end="url(#arr4)"/>
+          <line x1="505" y1="452" x2="673" y2="452" marker-end="url(#arr4)"/>
+          <line x1="505" y1="488" x2="673" y2="488" marker-end="url(#arr4)"/>
+          <line x1="505" y1="634" x2="673" y2="634" marker-end="url(#arr4)"/>
+        </g>
+        <!-- dashed response / stream arrows -->
+        <g stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity=".8">
+          <line x1="505" y1="176" x2="342" y2="176" marker-end="url(#arr4)"/>
+          <line x1="505" y1="384" x2="342" y2="384" marker-end="url(#arr4)"/>
+          <line x1="505" y1="536" x2="342" y2="536" marker-end="url(#arr4)"/>
+          <line x1="505" y1="566" x2="342" y2="566" marker-end="url(#arr4)"/>
+          <line x1="505" y1="690" x2="342" y2="690" marker-end="url(#arr4)"/>
+          <line x1="505" y1="780" x2="342" y2="780" marker-end="url(#arr4)"/>
+          <line x1="340" y1="810" x2="207" y2="810" marker-end="url(#arr4)"/>
+          <line x1="205" y1="840" x2="72" y2="840" marker-end="url(#arr4)"/>
+        </g>
+        <!-- LLM hop: the one accented mechanism -->
+        <g stroke="var(--accent)" stroke-width="1.4">
+          <line x1="505" y1="720" x2="1138" y2="720" marker-end="url(#arrA)"/>
+          <line x1="1140" y1="750" x2="507" y2="750" marker-end="url(#arrA)" stroke-dasharray="5 4"/>
+        </g>
+        <!-- message labels -->
+        <g fill="currentColor" class="dg halo" font-size="11.5" text-anchor="middle">
+          <text x="138" y="80">1 &middot; why is payments-api flaky in prod?</text>
+          <text x="272" y="110">2 &middot; POST /api/chat/stream</text>
+          <text x="422" y="140">3 &middot; A2A SendStreamingMessage &middot; claims, contextId</text>
+          <text x="422" y="170">4 &middot; status: resolving context</text>
+          <text x="590" y="200">5 &middot; ocp__get_app_registry_entry</text>
+          <text x="750" y="230">6 &middot; get_app_registry_entry</text>
+          <text x="590" y="260">7 &middot; obs__find_app_placements</text>
+          <text x="830" y="290">8 &middot; find_app_placements</text>
+          <text x="615" y="337">context resolved: payments-api &middot; prod &middot; prod-east-1 + prod-east-2</text>
+          <text x="422" y="378">9 &middot; status: attesting 2 clusters</text>
+          <text x="590" y="446">10 &middot; ocp__get_cluster_version / operators / nodes / mcpools</text>
+          <text x="590" y="482">11 &middot; obs__get_firing_alerts / capacity</text>
+          <text x="422" y="530">12 &middot; artifact: attestation_report (JSON)</text>
+          <text x="422" y="560">13 &middot; status: running Application 360</text>
+          <text x="590" y="628">14 &middot; ocp__get_workloads / events / quotas &middot; obs__golden_signals</text>
+          <text x="422" y="684">15 &middot; artifact: app360_report (JSON)</text>
+          <text x="822" y="714" fill="var(--accent)">16 &middot; narrative synthesis &middot; grounded in check JSON</text>
+          <text x="822" y="744" fill="var(--accent)">17 &middot; streamed tokens</text>
+          <text x="422" y="774">18 &middot; streamed message + final status</text>
+          <text x="272" y="804">19 &middot; normalized SSE &middot; status, cards, tokens</text>
+          <text x="138" y="834">20 &middot; attestation card &middot; App 360 card &middot; narrative</text>
+        </g>
+        <!-- loop tags -->
+        <g fill="currentColor" class="dg-mono halo" opacity=".8">
+          <text x="453" y="419">loop &middot; per cluster, checks concurrent</text>
+          <text x="453" y="601">loop &middot; App 360 battery</text>
+        </g>
+      </svg>
     </div>
-    <figcaption><span class="fig-n">Figure 3</span>First-contact triage. Steps 4-19 are the deterministic phases (code, not model); the LLM enters only at step 20, with the completed evidence in hand.</figcaption>
+    <figcaption><span class="fig-n">Figure 3</span>First-contact triage. Steps 4-15 are the deterministic phases (code, not model); the LLM enters only at steps 16-17 (accented), with the completed evidence in hand.</figcaption>
   </figure>
 
   <h3>9.2 Clarification on ambiguous context</h3>
   <figure>
     <div class="figure-panel">
-      <pre class="mermaid">
-sequenceDiagram
-  autonumber
-  actor U as SRE (6 apps)
-  participant A as Agent
-  U->>A: "Is my stuff healthy?"
-  A->>A: Context resolution finds 6 candidate apps
-  A-->>U: input-required: "Which application? 1 checkout, 2 loyalty, ..."
-  U->>A: "checkout, prod"
-  A->>A: Context resolved; attestation + App 360 proceed
-  A-->>U: Reports + narrative
-      </pre>
+      <svg viewBox="0 0 880 330" role="img" aria-label="Clarification sequence: an SRE with six applications asks a vague question; context resolution finds six candidates, the agent asks one input-required question listing the options, the SRE picks one, and the deterministic phases proceed" style="min-width:640px">
+        <defs>
+          <marker id="arr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".3">
+          <line x1="170" y1="52" x2="170" y2="310"/>
+          <line x1="560" y1="52" x2="560" y2="310"/>
+        </g>
+        <g fill="var(--surface2)" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2">
+          <rect x="115" y="18" width="110" height="34" rx="4"/>
+          <rect x="505" y="18" width="110" height="34" rx="4"/>
+        </g>
+        <g fill="currentColor" class="dg" font-weight="600" text-anchor="middle">
+          <text x="170" y="40">SRE &middot; 6 apps</text>
+          <text x="560" y="40">Agent</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1.3" fill="none">
+          <line x1="170" y1="92" x2="558" y2="92" marker-end="url(#arr5)"/>
+          <path d="M560,116 h44 v16 h-44" marker-end="url(#arr5)"/>
+          <line x1="170" y1="212" x2="558" y2="212" marker-end="url(#arr5)"/>
+          <path d="M560,236 h44 v16 h-44" marker-end="url(#arr5)"/>
+        </g>
+        <g stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity=".8">
+          <line x1="560" y1="178" x2="172" y2="178" marker-end="url(#arr5)"/>
+          <line x1="560" y1="296" x2="172" y2="296" marker-end="url(#arr5)"/>
+        </g>
+        <g fill="currentColor" class="dg halo" font-size="11.5" text-anchor="middle">
+          <text x="365" y="86">1 &middot; is my stuff healthy?</text>
+          <text x="365" y="172">3 &middot; input-required: which application? 1 checkout &middot; 2 loyalty &middot; ...</text>
+          <text x="365" y="206">4 &middot; checkout, prod</text>
+          <text x="365" y="290">6 &middot; reports + narrative</text>
+        </g>
+        <g fill="currentColor" class="dg halo" font-size="11" text-anchor="start" opacity=".85">
+          <text x="616" y="120">2 &middot; context resolution finds</text>
+          <text x="616" y="134">6 candidate applications</text>
+          <text x="616" y="240">5 &middot; context resolved;</text>
+          <text x="616" y="254">attestation + App 360 run</text>
+        </g>
+      </svg>
     </div>
     <figcaption><span class="fig-n">Figure 4</span>Ambiguity costs exactly one question (FR-CTX-4), delivered through the standard A2A input-required state.</figcaption>
   </figure>
@@ -1031,19 +1139,48 @@ sequenceDiagram
   <h3>9.3 Follow-up with stale attestation</h3>
   <figure>
     <div class="figure-panel">
-      <pre class="mermaid">
-sequenceDiagram
-  autonumber
-  actor U as User
-  participant A as Agent
-  participant G as Gateway
-  U->>A: (12 min later) "And what about memory usage?"
-  A->>A: Attestation age exceeds TTL (300 s)
-  A-->>U: status: "Re-attesting prod-east-1, prod-east-2"
-  A->>G: attestation battery (changes noted)
-  A->>G: obs__query: container memory vs limits
-  A-->>U: Answer, prefixed with any attestation change
-      </pre>
+      <svg viewBox="0 0 980 340" role="img" aria-label="Stale attestation sequence: twelve minutes later the user asks a follow-up; the attestation age exceeds its TTL, so the agent re-runs the attestation battery through the gateway before querying memory usage and answering" style="min-width:700px">
+        <defs>
+          <marker id="arr6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".3">
+          <line x1="120" y1="52" x2="120" y2="318"/>
+          <line x1="480" y1="52" x2="480" y2="318"/>
+          <line x1="830" y1="52" x2="830" y2="318"/>
+        </g>
+        <g fill="var(--surface2)" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2">
+          <rect x="65" y="18" width="110" height="34" rx="4"/>
+          <rect x="425" y="18" width="110" height="34" rx="4"/>
+          <rect x="775" y="18" width="110" height="34" rx="4"/>
+        </g>
+        <g fill="currentColor" class="dg" font-weight="600" text-anchor="middle">
+          <text x="120" y="40">User</text>
+          <text x="480" y="40">Agent</text>
+          <text x="830" y="40">Gateway</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1.3" fill="none">
+          <line x1="120" y1="92" x2="478" y2="92" marker-end="url(#arr6)"/>
+          <path d="M480,116 h44 v16 h-44" marker-end="url(#arr6)"/>
+          <line x1="480" y1="220" x2="828" y2="220" marker-end="url(#arr6)"/>
+          <line x1="480" y1="254" x2="828" y2="254" marker-end="url(#arr6)"/>
+        </g>
+        <g stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity=".8">
+          <line x1="480" y1="186" x2="122" y2="186" marker-end="url(#arr6)"/>
+          <line x1="480" y1="306" x2="122" y2="306" marker-end="url(#arr6)"/>
+        </g>
+        <g fill="currentColor" class="dg halo" font-size="11.5" text-anchor="middle">
+          <text x="300" y="86">1 &middot; (12 min later) what about memory usage?</text>
+          <text x="300" y="180">3 &middot; status: re-attesting prod-east-1, prod-east-2</text>
+          <text x="655" y="214">4 &middot; attestation battery &middot; changes noted</text>
+          <text x="655" y="248">5 &middot; obs__query: container memory vs limits</text>
+          <text x="300" y="300">6 &middot; answer, prefixed with any attestation change</text>
+        </g>
+        <g fill="currentColor" class="dg halo" font-size="11" text-anchor="start" opacity=".85">
+          <text x="536" y="126">2 &middot; attestation age exceeds TTL (300 s)</text>
+        </g>
+      </svg>
     </div>
     <figcaption><span class="fig-n">Figure 5</span>The always-attest rule holds across the whole conversation, not just the first turn (FR-ATT-7).</figcaption>
   </figure>
@@ -1096,15 +1233,52 @@ sequenceDiagram
   <h3>9.5 Fleet cluster resolution</h3>
   <figure>
     <div class="figure-panel">
-      <pre class="mermaid">
-flowchart LR
-  Q["query: name, alias,<br/>label, or fuzzy text"] --> RES["ocp__resolve_cluster"]
-  RES --> REG[("fleet.yaml registry<br/>indexed, 100s of clusters")]
-  REG --> M{matches}
-  M -- "exactly 1" --> ONE["resolved cluster identity"]
-  M -- several --> LIST["ranked candidates:<br/>agent filters or asks"]
-  M -- none --> NONE["not found +<br/>nearest names"]
-      </pre>
+      <svg viewBox="0 0 1240 250" role="img" aria-label="Fleet cluster resolution flow: a query by name, alias, label, or fuzzy text goes to the resolve tool, which searches the indexed fleet registry; exactly one match resolves the cluster, several matches return ranked candidates, and no match returns nearest names" style="min-width:860px">
+        <defs>
+          <marker id="arr7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="20" y="92" width="180" height="60" rx="4"/>
+          <rect x="250" y="92" width="190" height="60" rx="4"/>
+          <ellipse cx="595" cy="100" rx="100" ry="11"/>
+          <line x1="495" y1="100" x2="495" y2="150"/>
+          <line x1="695" y1="100" x2="695" y2="150"/>
+          <path d="M495,150 A100,11 0 0 0 695,150"/>
+          <path d="M745,125 L815,89 L885,125 L815,161 Z"/>
+          <rect x="955" y="30" width="265" height="54" rx="4"/>
+          <rect x="955" y="98" width="265" height="54" rx="4"/>
+          <rect x="955" y="166" width="265" height="54" rx="4"/>
+        </g>
+        <g stroke="currentColor" stroke-width="1.3" fill="none">
+          <line x1="200" y1="122" x2="248" y2="122" marker-end="url(#arr7)"/>
+          <line x1="440" y1="122" x2="490" y2="122" marker-end="url(#arr7)"/>
+          <line x1="697" y1="125" x2="743" y2="125" marker-end="url(#arr7)"/>
+          <path d="M815,89 V57 H953" marker-end="url(#arr7)"/>
+          <line x1="885" y1="125" x2="953" y2="125" marker-end="url(#arr7)"/>
+          <path d="M815,161 V193 H953" marker-end="url(#arr7)"/>
+        </g>
+        <g fill="currentColor" class="dg" text-anchor="middle">
+          <text x="110" y="117">query: name, alias,</text>
+          <text x="110" y="133">label, or fuzzy text</text>
+          <text x="345" y="127" class="dg-mono" font-size="12">ocp__resolve_cluster</text>
+          <text x="595" y="128">fleet registry</text>
+          <text x="595" y="143" font-size="10.5" opacity=".7">fleet.yaml &middot; 100s of clusters</text>
+          <text x="815" y="129" font-size="11.5">matches?</text>
+          <text x="1087" y="52">resolved cluster identity</text>
+          <text x="1087" y="68" font-size="10.5" opacity=".7">single unambiguous match</text>
+          <text x="1087" y="120">ranked candidates</text>
+          <text x="1087" y="136" font-size="10.5" opacity=".7">agent filters or asks the user</text>
+          <text x="1087" y="188">not found</text>
+          <text x="1087" y="204" font-size="10.5" opacity=".7">nearest names suggested</text>
+        </g>
+        <g fill="currentColor" class="dg-mono halo" opacity=".8" text-anchor="middle">
+          <text x="880" y="50">exactly 1</text>
+          <text x="918" y="116">several</text>
+          <text x="872" y="188">none</text>
+        </g>
+      </svg>
     </div>
     <figcaption><span class="fig-n">Figure 7</span>Every cluster-scoped tool requires an explicitly resolved cluster (FR-MCP-2); resolution is its own tool so the fleet of hundreds stays navigable by name, alias, label, or fuzzy match.</figcaption>
   </figure>
@@ -1159,6 +1333,21 @@ flowchart LR
       <tr><td>18. Final assessment</td><td>deterministic status mapping + LLM reason</td><td><span class="pill ok">automated</span></td></tr>
     </tbody>
   </table></div>
+
+  <h3>10.3 Coverage against the source operations checklist</h3>
+  <p>The internal 15-category checklist (161 items) and the report template are transcribed verbatim, with a coverage tag on every item, in <code>docs/reference/source-checklists.md</code>. The rollup:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Coverage</th><th class="num">Items</th><th class="num">Share</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill ok">auto</span></td><td class="num">92</td><td class="num">57%</td><td>Deterministic MCP-tool checks in the MVP batteries</td></tr>
+      <tr><td><span class="pill dim">registry</span></td><td class="num">27</td><td class="num">17%</td><td>Application registry fields (owners, SLA, backup policy, runbooks)</td></tr>
+      <tr><td><span class="pill info">llm</span></td><td class="num">3</td><td class="num">2%</td><td>Grounded narrative (failure impact, SPOF reasoning, risk ranking)</td></tr>
+      <tr><td><span class="pill dim">manual</span></td><td class="num">14</td><td class="num">9%</td><td>Rendered as manual fields awaiting human input</td></tr>
+      <tr><td><span class="pill warn">M3</span></td><td class="num">12</td><td class="num">7%</td><td>Live-mode probes: connectivity, drift diffs, deprecation signals</td></tr>
+      <tr><td><span class="pill warn">M4</span></td><td class="num">13</td><td class="num">8%</td><td>Needs ITSM, vulnerability scanners, feature-flag or backup systems</td></tr>
+    </tbody>
+  </table></div>
+  <p>No item is silently dropped: everything renders in the report with its source tag (FR-360-6). Known transcription gaps: the template's section 12 field list is cut mid-table in the photos, and sections 13-15 field pages were not captured; their batteries derive from checklist categories 12-14 until those pages are supplied.</p>
 </section>
 
 <!-- ================================ 11 ================================ -->
@@ -1166,6 +1355,7 @@ flowchart LR
   <h2><span class="secnum">11</span>Report formats</h2>
   <p>The Application 360 Report renders exactly in the organization's template structure: an executive summary block (application, namespace, cluster, environment, owners, report date, overall status pill, 1-3 sentence summary), one fact table per section (<span class="mono">Item | Value</span> with status pills), a findings note per section, numbered recommendations, and a final assessment (status, reason, next review date).</p>
   <p>The attestation card renders one row per cluster: verdict pill, the failing or maintenance signals, and timestamps. Narrative text in chat follows the incident-summary idiom from the existing console: <strong>Summary, Impact Assessment, Root Cause Indicators, Next Steps</strong>.</p>
+  <p>Each report section carries its individual check rows: collapsed, a row shows the check name, status pill, and observed value; expanded, it reveals the evidence trail (tool called, arguments, observed value versus threshold, timestamp, runbook link) per FR-360-9 and FR-UI-7.</p>
   <p>All three are delivered as typed JSON artifacts over A2A and rendered client-side; Markdown export mirrors the same structure (FR-360-7).</p>
 </section>
 
@@ -1281,7 +1471,12 @@ flowchart LR
               <div class="report-card">
                 <div class="rh"><span>Application 360 &middot; payments-api &middot; payments-prod @ prod-east-2</span><span class="pill warn">at risk</span></div>
                 <div class="sec"><span class="sn">3. Deployment overview</span><span class="pill ok">healthy</span></div>
-                <div class="sec"><span class="sn">4. Runtime health &middot; 7 restarts, OOMKilled x2</span><span class="pill crit">failing</span></div>
+                <div class="sec"><span class="sn">&#9662; 4. Runtime health &middot; 7 restarts, OOMKilled x2</span><span class="pill crit">failing</span></div>
+                <div class="sec-detail">
+                  <span class="dhl">check pod-restarts &middot; tool ocp__get_workloads &middot; 14:02:15</span>
+                  <span>observed: 7 restarts / 60 min &middot; threshold: &lt;= 3 &middot; last state OOMKilled (137)</span>
+                  <span>runbook: KubePodCrashLooping &middot; evidence: payments-api-6d9c (2 pods)</span>
+                </div>
                 <div class="sec"><span class="sn">11. Platform context &middot; host cluster degraded</span><span class="pill warn">warning</span></div>
                 <div class="sec"><span class="sn">12. Capacity &middot; memory limit 512Mi, p95 at 497Mi</span><span class="pill warn">warning</span></div>
                 <div class="sec"><span class="sn">14 more sections</span><span class="pill dim">expand</span></div>
@@ -1313,7 +1508,7 @@ flowchart LR
         </div>
       </div></div>
     </div>
-    <figcaption><span class="fig-n">Figure 8</span>Static mock of the console MVP: red masthead, context and attestation cards (left), chat with phase ticks and the typed Application 360 report card (center), dark activity log keyed by thread id (right). Built from the same design tokens the SPA will ship with.</figcaption>
+    <figcaption><span class="fig-n">Figure 8</span>Static mock of the console MVP: red masthead, context and attestation cards (left), chat with phase ticks and the typed Application 360 report card with one failing check expanded to its evidence (center), dark activity log keyed by thread id (right). Built from the same design tokens the SPA will ship with.</figcaption>
   </figure>
 
   <h3>Layout regions</h3>

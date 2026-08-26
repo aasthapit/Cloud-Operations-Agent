@@ -54,6 +54,8 @@ Two internal artifacts define the triage practice this product automates:
 1. A "Detailed Operations Checklist" covering 15 categories from application identity through supportability.
 2. An "OpenShift Application 360 Report Template" with 18 sections, an executive summary, per-section fact tables, findings notes, recommendations, and a final assessment.
 
+Both artifacts are transcribed verbatim from the supplied document photos, with a per-item accounting of how the MVP covers each of the 161 checklist items, in `docs/reference/source-checklists.md` (rollup in Section 10.3).
+
 The existing "Platform Management - Agentic AI" console (IPE) establishes the UI language: a red masthead, a light card-grid dashboard (incidents, alerts, changes, observability, dependency map), an embedded AI Assistant chat, and a dark log explorer.
 This product follows that visual language without depending on that platform.
 
@@ -249,6 +251,7 @@ Model, temperature, and loop budget live in `models.yaml`, hot-reloaded.
 - FR-360-6. Sections whose data source is not yet automated MUST render as `manual` or `registry` sourced rather than silently disappearing.
 - FR-360-7. The report MUST be exportable (Markdown download in MVP).
 - FR-360-8. When the same application runs in multiple in-scope instances (cluster, namespace pairs), the report MUST cover each instance or state which instance it covers.
+- FR-360-9. The report artifact MUST embed the underlying per-check results (id, section, status, observed value, threshold, evidence, runbook URL) so clients can render check-level drill-down without re-querying.
 
 ### 7.4 Conversation and analysis (FR-CHAT)
 
@@ -295,6 +298,7 @@ Model, temperature, and loop budget live in `models.yaml`, hot-reloaded.
 - FR-UI-4. The dev identity picker MUST be visible only in dev mode.
 - FR-UI-5. Clarification requests (A2A `input-required`) MUST render as normal chat turns with quick-pick options.
 - FR-UI-6. The UI MUST remain a thin client: no triage logic, no direct MCP access.
+- FR-UI-7. Report cards MUST render per-check status rows (healthy / warning / failing / maintenance / manual / registry) that expand in place to show the check's evidence: tool called, arguments, observed value versus threshold, timestamp, and runbook link.
 
 ### 7.9 Identity (FR-ID)
 
@@ -491,11 +495,29 @@ False-positive guards from kubernetes-mixin (rollout-in-progress guards, Jobs ex
 | 17. Recommendations | LLM narrative, grounded | automated (narrative) |
 | 18. Final assessment | deterministic status mapping + LLM reason | automated |
 
+### 10.3 Coverage against the source operations checklist
+
+The internal 15-category checklist (161 items) and the report template are transcribed verbatim, with a coverage tag on every item, in `docs/reference/source-checklists.md`.
+The rollup:
+
+| Coverage | Items | Share | Meaning |
+|---|---|---|---|
+| auto | 92 | 57% | Deterministic MCP-tool checks in the MVP batteries |
+| registry | 27 | 17% | Application registry fields (owners, SLA, backup policy, runbooks) |
+| llm | 3 | 2% | Grounded narrative (failure impact, SPOF reasoning, risk ranking) |
+| manual | 14 | 9% | Rendered as manual fields awaiting human input |
+| M3 | 12 | 7% | Live-mode probes: connectivity, drift diffs, deprecation signals |
+| M4 | 13 | 8% | Needs ITSM, vulnerability scanners, feature-flag or backup systems |
+
+No item is silently dropped: everything renders in the report with its source tag (FR-360-6).
+Known transcription gaps: the template's section 12 field list is cut mid-table in the photos, and sections 13-15 field pages were not captured; their batteries derive from checklist categories 12-14 until those pages are supplied.
+
 ## 11. Report formats
 
 The Application 360 Report renders exactly in the organization's template structure: an executive summary block (application, namespace, cluster, environment, owners, report date, overall status pill, 1-3 sentence summary), one fact table per section (`Item | Value` with status pills), a findings note per section, numbered recommendations, and a final assessment (status, reason, next review date).
 The attestation card renders one row per cluster: verdict pill (`healthy` green, `maintenance` blue, `degraded` red, `unattestable` amber), the failing/maintenance signals, and timestamps.
 Narrative text in chat follows the IPE incident-summary idiom: Summary, Impact Assessment, Root Cause Indicators, Next Steps.
+Each report section carries its individual check rows: collapsed, a row shows the check name, status pill, and observed value; expanded, it reveals the evidence trail (tool, arguments, observed value versus threshold, timestamp, runbook link) per FR-360-9 and FR-UI-7.
 All three are delivered as typed JSON artifacts over A2A and rendered client-side; Markdown export mirrors the same structure.
 
 ## 12. Configuration plane layout
