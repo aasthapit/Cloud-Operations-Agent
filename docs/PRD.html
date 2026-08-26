@@ -366,6 +366,9 @@
   .attrow:last-child { border-bottom: none; }
   .attrow .cl { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; }
   .attrow .why { color: var(--muted); font-size: 10.5px; }
+  .att-detail { border-top: 1px dashed var(--line); margin-top: 2px; padding: 4px 0 2px 6px; display: flex; flex-direction: column; gap: 2px; font-size: 10px; }
+  .att-detail .adrow { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+  .att-detail .ev { color: var(--muted); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 9px; padding-left: 6px; }
   .chat-turns { display: flex; flex-direction: column; gap: 9px; padding: 11px; min-height: 330px; }
   .bubble { border-radius: 8px; padding: 8px 12px; max-width: 92%; }
   .bubble.user { align-self: flex-end; background: var(--info-bg); border: 1px solid var(--line); }
@@ -842,6 +845,7 @@
     <div class="req"><div class="rid">FR-ATT-6</div><div class="rtx">Attestation results <span class="kw">MUST</span> carry per-check evidence (tool, query, observed value, threshold, severity, optional runbook URL).</div></div>
     <div class="req"><div class="rid">FR-ATT-7</div><div class="rtx">Attestation results <span class="kw">MUST</span> be cached per thread with a configurable TTL; the runtime <span class="kw">MUST</span> re-attest when stale before answering further questions.</div></div>
     <div class="req"><div class="rid">FR-ATT-8</div><div class="rtx">The attestation <span class="kw">MUST</span> render in the console as a structured card (per-cluster verdict grid), independent of the LLM narrative.</div></div>
+    <div class="req"><div class="rid">FR-ATT-9</div><div class="rtx">The attestation card <span class="kw">MUST</span> expand per cluster into a detailed attestation: every battery check as a status row, passes included, each opening to its evidence under the same drill-down contract as FR-UI-7; the attestation artifact <span class="kw">MUST</span> embed those per-check results (same shape as FR-360-9) and <span class="kw">MUST</span> be exportable like the Application 360 report.</div></div>
   </div>
 
   <h3>7.3 Application 360 report (FR-360)</h3>
@@ -1354,7 +1358,7 @@
 <section class="doc" id="s11">
   <h2><span class="secnum">11</span>Report formats</h2>
   <p>The Application 360 Report renders exactly in the organization's template structure: an executive summary block (application, namespace, cluster, environment, owners, report date, overall status pill, 1-3 sentence summary), one fact table per section (<span class="mono">Item | Value</span> with status pills), a findings note per section, numbered recommendations, and a final assessment (status, reason, next review date).</p>
-  <p>The attestation card renders one row per cluster: verdict pill, the failing or maintenance signals, and timestamps. Narrative text in chat follows the incident-summary idiom from the existing console: <strong>Summary, Impact Assessment, Root Cause Indicators, Next Steps</strong>.</p>
+  <p>The attestation card renders one row per cluster: verdict pill, the failing or maintenance signals, and timestamps. Each cluster row expands into the <strong>detailed attestation</strong>: all battery checks as status rows, passed checks included, each opening to its evidence, so a &ldquo;healthy&rdquo; verdict is itself auditable check by check (FR-ATT-9). Narrative text in chat follows the incident-summary idiom from the existing console: <strong>Summary, Impact Assessment, Root Cause Indicators, Next Steps</strong>.</p>
   <p>Each report section carries its individual check rows: collapsed, a row shows the check name, status pill, and observed value; expanded, it reveals the evidence trail (tool called, arguments, observed value versus threshold, timestamp, runbook link) per FR-360-9 and FR-UI-7.</p>
   <p>All three are delivered as typed JSON artifacts over A2A and rendered client-side; Markdown export mirrors the same structure (FR-360-7).</p>
 </section>
@@ -1446,8 +1450,16 @@
                   <span class="pill ok">healthy</span>
                 </div>
                 <div class="attrow">
-                  <div><div class="cl">prod-east-2</div><div class="why">ingress operator degraded; MCP worker updating 2/6</div></div>
+                  <div><div class="cl">&#9662; prod-east-2</div><div class="why">ingress operator degraded; MCP worker updating 2/6</div></div>
                   <span class="pill crit">degraded</span>
+                </div>
+                <div class="att-detail">
+                  <div class="adrow"><span>cluster-operators</span><span class="pill crit">fail</span></div>
+                  <div class="ev">ingress Degraded=True since 13:41 &middot; runbook</div>
+                  <div class="adrow"><span>machine-config-pools</span><span class="pill info">maint</span></div>
+                  <div class="ev">worker Updating 2/6 &middot; not paused</div>
+                  <div class="adrow"><span>nodes &middot; 39/41 ready, 2 cordoned</span><span class="pill warn">warn</span></div>
+                  <div class="adrow"><span>9 more checks</span><span class="pill ok">pass</span></div>
                 </div>
               </div>
             </div>
@@ -1556,7 +1568,7 @@
     <tbody>
       <tr><td><span class="mono">M0</span> <span class="pill ok">done</span></td><td>Repo, scaffold, config seed, research, this PRD</td></tr>
       <tr><td><span class="mono">M1</span></td><td>Full mock-mode MVP per acceptance criteria</td></tr>
-      <tr><td><span class="mono">M2</span></td><td>Hardening: tests to target, telemetry polish, docs, demo script</td></tr>
+      <tr><td><span class="mono">M2</span></td><td>Hardening: tests to target, telemetry polish, docs, demo script, and the evaluation harness (scenario suites of user prompts replayed against the mock fleet with scored expected outcomes; scoped in its own thread)</td></tr>
       <tr><td><span class="mono">M3</span></td><td>Live backends (kubeconfig/Thanos), JWT validation, Grafana links</td></tr>
       <tr><td><span class="mono">M4</span></td><td>New domains, ITSM ingestion, guarded remediation actions</td></tr>
     </tbody>

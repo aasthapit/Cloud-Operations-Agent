@@ -1088,7 +1088,7 @@
   <p><strong>Persona:</strong> SRE working the platform itself. A cluster-scoped ask needs no application context; the fleet resolver turns any reasonable name into an exact cluster before anything runs.</p>
 
   <div class="frame">
-    <div class="frame-head"><span>F6 &middot; frame 1/1 &middot; <span class="t">T+3.4s</span></span><span class="pill ok">cluster attested</span></div>
+    <div class="frame-head"><span>F6 &middot; frame 1/2 &middot; <span class="t">T+3.4s</span></span><span class="pill ok">cluster attested</span></div>
     <div class="frame-scroll"><div class="console">
       <div class="cc-mast">
         <span class="t">Cloud Operations Agent</span>
@@ -1139,6 +1139,71 @@
     </div></div>
   </div>
   <p class="frame-cap"><span class="fig-n">F6.1</span>An imperative ask, a status-page answer. The context card switches to cluster scope with no application <span class="nb">1</span>; the resolver matched the exact name (near-matches would come back as ranked candidates instead of a guess); the answer volunteers what changed recently, which is what an SRE opens this tool to learn <span class="nb">2</span>. <span class="fr">FR-MCP-1,2 &middot; FR-CTX-7 &middot; FR-ATT-8</span></p>
+
+  <div class="frame">
+    <div class="frame-head"><span>F6 &middot; frame 2/2 &middot; <span class="t">card expanded</span></span><span class="pill dim">detailed attestation</span></div>
+    <div class="frame-scroll"><div class="console">
+      <div class="cc-mast">
+        <span class="t">Cloud Operations Agent</span>
+        <span class="u"><span class="pill dim">dev identity</span> Platform SRE &middot; sre-core <span class="avatar">PS</span></span>
+      </div>
+      <div class="cc-cols">
+        <div>
+          <div class="mcard">
+            <div class="mh">Context</div>
+            <div class="mb">
+              <div class="kvrow"><span class="k">Scope</span><span class="v">cluster</span></div>
+              <div class="kvrow"><span class="k">Cluster</span><span class="v mono">prod-east-2</span></div>
+            </div>
+          </div>
+          <div class="mcard">
+            <div class="mh">Cluster attestation <span class="pill dim">just now</span></div>
+            <div class="mb">
+              <div class="attrow"><div><div class="cl">prod-east-2</div><div class="why">12/12 checks passed</div></div><span class="pill ok">healthy</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="chatcol">
+          <div class="mh">AI Assistant <span class="pill dim">idle</span></div>
+          <div class="turns">
+            <div class="report-card">
+              <div class="rh"><span><span class="nb" style="position:static">1</span> Detailed attestation &middot; prod-east-2 <span class="sub">14:26:08 &middot; battery v a41c9e2</span></span><span class="pill ok">healthy</span></div>
+              <div class="sec"><span class="sn">1. api-reachability &middot; 118ms</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn"><span class="nb" style="position:static">2</span> &#9662; 2. cluster-version &middot; 4.16.9</span><span class="pill ok">pass</span></div>
+              <div class="sec-detail">
+                <span class="dhl">check cluster-version &middot; tool ocp__get_cluster_version &middot; 14:26:06</span>
+                <span>observed: Available=True, Progressing=False, Failing=False &middot; 4.16.9</span>
+                <span>evidence: update 4.16.8 &rarr; 4.16.9 completed 14:07 &middot; channel stable-4.16</span>
+              </div>
+              <div class="sec"><span class="sn">3. cluster-operators &middot; 33/33 available</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">4. nodes &middot; 41/41 ready, 0 cordoned</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">5. machine-config-pools &middot; all updated, worker settled 14:19</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">6. etcd &middot; leader stable, 3/3 members</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">7. firing-alerts &middot; 0 critical, 1 info</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn"><span class="nb" style="position:static">3</span> 8. watchdog-present &middot; firing (monitoring trusted)</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">9. apiserver-slo &middot; 5xx 0.02%</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">10. capacity &middot; CPU req 61%, mem req 58% of allocatable</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">11. pending-csrs &middot; 0</span><span class="pill ok">pass</span></div>
+              <div class="sec"><span class="sn">12. cert-expiry &middot; none within 30d</span><span class="pill ok">pass</span></div>
+              <div class="export-row"><span class="btn">Export .md</span><span class="btn">Copy evidence</span></div>
+            </div>
+          </div>
+          <div class="inrow"><div class="field">Ask a follow-up&hellip;</div><div class="send">Send</div></div>
+        </div>
+        <div>
+          <div class="log-panel">
+            <div class="mh">Activity log <span>ctx-95</span></div>
+            <div class="lines">
+<span class="ts">14:26:31.240</span> <span class="dim-t">ui</span>    expand attestation card<br>
+<span class="ts">14:26:31.241</span> <span class="dim-t">ui</span>    render 12 embedded checks<br>
+<span class="ts">14:26:35.017</span> <span class="dim-t">ui</span>    expand check cluster-version
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <p class="frame-cap"><span class="fig-n">F6.2</span>Even &ldquo;healthy&rdquo; is auditable. The detailed attestation lists the whole battery with observed values on every row, passes included <span class="nb">1</span>; any row opens to its evidence trail from the embedded results, no re-query <span class="nb">2</span>; the Watchdog row makes the trust chain explicit: monitoring itself was verified before anything else was believed <span class="nb">3</span>. Export mirrors the Application 360 report. This same expansion is available wherever the attestation card appears (F1, F4, F5). <span class="fr">FR-ATT-6,9 &middot; FR-360-9</span></p>
 </section>
 
 <!-- ================================ F7 ================================ -->

@@ -240,6 +240,7 @@ Model, temperature, and loop budget live in `models.yaml`, hot-reloaded.
 - FR-ATT-6. Attestation results MUST carry per-check evidence (tool, query, observed value, threshold, severity, optional runbook URL).
 - FR-ATT-7. Attestation results MUST be cached per thread with a configurable TTL (`models.yaml: agent.attestation_ttl_seconds`); the runtime MUST re-attest when stale before answering further questions.
 - FR-ATT-8. The attestation MUST render in the console as a structured card (per-cluster verdict grid), independent of the LLM narrative.
+- FR-ATT-9. The attestation card MUST expand per cluster into a detailed attestation: every battery check as a status row, passes included, each opening to its evidence under the same drill-down contract as FR-UI-7; the attestation artifact MUST embed those per-check results (same shape as FR-360-9) and MUST be exportable like the Application 360 report.
 
 ### 7.3 Application 360 report (FR-360)
 
@@ -516,6 +517,7 @@ Known transcription gaps: the template's section 12 field list is cut mid-table 
 
 The Application 360 Report renders exactly in the organization's template structure: an executive summary block (application, namespace, cluster, environment, owners, report date, overall status pill, 1-3 sentence summary), one fact table per section (`Item | Value` with status pills), a findings note per section, numbered recommendations, and a final assessment (status, reason, next review date).
 The attestation card renders one row per cluster: verdict pill (`healthy` green, `maintenance` blue, `degraded` red, `unattestable` amber), the failing/maintenance signals, and timestamps.
+Each cluster row expands into the detailed attestation: all battery checks as status rows, passed checks included, each opening to its evidence, so a "healthy" verdict is itself auditable check by check (FR-ATT-9).
 Narrative text in chat follows the IPE incident-summary idiom: Summary, Impact Assessment, Root Cause Indicators, Next Steps.
 Each report section carries its individual check rows: collapsed, a row shows the check name, status pill, and observed value; expanded, it reveals the evidence trail (tool, arguments, observed value versus threshold, timestamp, runbook link) per FR-360-9 and FR-UI-7.
 All three are delivered as typed JSON artifacts over A2A and rendered client-side; Markdown export mirrors the same structure.
@@ -619,7 +621,7 @@ No Wells Fargo marks, names, or proprietary assets are used.
 |---|---|
 | M0 (done) | Repo, scaffold, config seed, research, this PRD |
 | M1 | Full mock-mode MVP per acceptance criteria |
-| M2 | Hardening: tests to target, telemetry polish, docs, demo script |
+| M2 | Hardening: tests to target, telemetry polish, docs, demo script, and the evaluation harness (scenario suites of user prompts replayed against the mock fleet with scored expected outcomes; scoped in its own thread) |
 | M3 | Live backends (kubeconfig/Thanos), JWT validation, Grafana links |
 | M4 | New domains, ITSM ingestion, guarded remediation actions |
 
