@@ -13,6 +13,9 @@ gateway tools (FR-CHAT-1). Three seams worth knowing:
 - before_tool_callback: enforces agent.max_tool_iterations per turn
   (FR-CHAT-5); past the budget the tool call is answered with an error
   payload instead of executing, which the model sees and must surface.
+- on_tool_error_callback: a hallucinated tool name or a failed tool call
+  becomes an error payload the model can recover from (retry with the
+  right name, or report honestly) instead of a crashed turn (F8).
 """
 
 from __future__ import annotations
@@ -77,6 +80,39 @@ def _tool_budget_callback(tool: Any, args: dict[str, Any], tool_context: Any) ->
     return None
 
 
+def _tool_error_callback(
+    tool: Any, args: dict[str, Any], tool_context: Any, error: Exception
+) -> dict[str, Any] | None:
+    """Convert tool failures into responses the model can act on.
+
+    Two cases land here: the model invented a tool name (small local models
+    confuse the ocp__/obs__ prefixes), or a real tool call failed downstream.
+    Returning a dict makes it the tool response, so the model gets one honest
+    chance to correct itself or report the failure; raising would kill the
+    whole turn, which is exactly what F8 forbids for a recoverable error.
+    """
+    name = getattr(tool, "name", "?")
+    if "not found" in str(error).lower():
+        log.warning("analyst.unknown_tool", tool=name)
+        return {
+            "error": f"No tool named '{name}' exists.",
+            "hint": (
+                "Tool names are exact and prefixed by domain: ocp__* for "
+                "OpenShift cluster and application state, obs__* for metrics, "
+                "alerts, and placements. Re-check the name and retry once, or "
+                "answer from the evidence you already have."
+            ),
+        }
+    log.error("analyst.tool_failed", tool=name, error=str(error))
+    return {
+        "error": f"Tool '{name}' failed: {type(error).__name__}.",
+        "hint": (
+            "Do not retry the same call. Tell the user this check could not "
+            "be completed and continue with the evidence you have."
+        ),
+    }
+
+
 def build_analyst() -> LlmAgent:
     settings = get_settings()
     toolset = McpToolset(
@@ -92,6 +128,7 @@ def build_analyst() -> LlmAgent:
         instruction=_instruction_provider(settings.config_dir),
         tools=[toolset],
         before_tool_callback=_tool_budget_callback,
+        on_tool_error_callback=_tool_error_callback,
         # The session history carries the full report fences (tens of KB of
         # JSON) which would bloat a small local model's prompt and slow
         # prefill badly. The orchestrator instead curates the model's view:
