@@ -1,0 +1,41 @@
+# ============================================================================
+# Inference and agent-loop tuning.
+# Hot-reloaded: services re-read this file on save; no restart needed.
+# Secrets do NOT belong here (this file is committed); endpoints with
+# credentials are configured via environment variables (.env).
+# ============================================================================
+
+inference:
+  # Only "ollama" is wired today. The agent talks to Ollama through LiteLLM,
+  # so adding hosted providers later is a one-line change in the agent's
+  # model factory plus a new provider block here.
+  provider: ollama
+
+  # Model served by the local Ollama instance. Must support tool calling.
+  # Known-good options installed on this machine:
+  #   qwen3:4b     - fast, decent tool use (default)
+  #   gpt-oss:20b  - much stronger tool use and reasoning, heavier
+  #   llama3.2:3b  - fastest, weakest tool use
+  model: qwen3:4b
+
+  # Ollama base URL comes from the OLLAMA_API_BASE environment variable so
+  # deployments can point at a remote inference host without editing config.
+
+  # Sampling. Keep temperature low: triage should be boring and repeatable.
+  temperature: 0.2
+  max_output_tokens: 4096
+
+agent:
+  # Safety valve for the LLM tool loop in the analysis phase. The
+  # deterministic check phases are not affected by this limit.
+  max_tool_iterations: 12
+
+  # How long a cluster health attestation stays fresh within one
+  # conversation thread. Past this age the agent re-attests before
+  # answering new questions about that cluster.
+  attestation_ttl_seconds: 300
+
+  # Automatically run the Application 360 report once user context
+  # (application + environment) is resolved. Set false to only run it
+  # when the user asks.
+  auto_app360: true

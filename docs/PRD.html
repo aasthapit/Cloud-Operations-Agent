@@ -1,0 +1,1420 @@
+<!-- Cloud Operations Agent PRD - HTML artifact source.
+     Published via claude.ai Artifacts; the runtime wraps this fragment in doctype/head/body.
+     Canonical text mirror: docs/PRD.md. Keep the two in sync when requirements change. -->
+<title>Cloud Operations Agent PRD</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #F7F5F2;
+    --surface: #FFFFFF;
+    --surface2: #EFECE6;
+    --ink: #20242A;
+    --muted: #5C6167;
+    --faint: #878C93;
+    --line: #E1DDD6;
+    --line-strong: #C7C2B9;
+    --band: #A8232F;
+    --band-deep: #8C1D27;
+    --band-ink: #FFF7F4;
+    --accent: #A8232F;
+    --gold: #B7891F;
+    --ok: #1E7A3C;
+    --ok-bg: #E4F0E7;
+    --warn: #96650A;
+    --warn-bg: #F5EBD7;
+    --crit: #B3262E;
+    --crit-bg: #F7E4E4;
+    --info: #1F5FA8;
+    --info-bg: #E3EBF5;
+    --neutral-bg: #ECE9E3;
+    --code-bg: #F0EDE8;
+    --panel-dark: #1B1E24;
+    --panel-dark-ink: #C9CDD4;
+    --panel-dark-line: #30343C;
+    --shadow: 0 1px 2px rgba(32,36,42,.06), 0 4px 14px rgba(32,36,42,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #16181C;
+      --surface: #1E2126;
+      --surface2: #23262C;
+      --ink: #E7E6E2;
+      --muted: #A6AAB0;
+      --faint: #7E838A;
+      --line: #2E3238;
+      --line-strong: #41464E;
+      --band: #6F1E27;
+      --band-deep: #5C1820;
+      --band-ink: #F6E9E7;
+      --accent: #DA5C67;
+      --gold: #CDA04A;
+      --ok: #5CB177;
+      --ok-bg: #1E2C22;
+      --warn: #D2A044;
+      --warn-bg: #2E2818;
+      --crit: #E0606B;
+      --crit-bg: #33201F;
+      --info: #74A8DE;
+      --info-bg: #1C2733;
+      --neutral-bg: #282C32;
+      --code-bg: #14161A;
+      --panel-dark: #14161B;
+      --panel-dark-ink: #C9CDD4;
+      --panel-dark-line: #2C3038;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #16181C;
+    --surface: #1E2126;
+    --surface2: #23262C;
+    --ink: #E7E6E2;
+    --muted: #A6AAB0;
+    --faint: #7E838A;
+    --line: #2E3238;
+    --line-strong: #41464E;
+    --band: #6F1E27;
+    --band-deep: #5C1820;
+    --band-ink: #F6E9E7;
+    --accent: #DA5C67;
+    --gold: #CDA04A;
+    --ok: #5CB177;
+    --ok-bg: #1E2C22;
+    --warn: #D2A044;
+    --warn-bg: #2E2818;
+    --crit: #E0606B;
+    --crit-bg: #33201F;
+    --info: #74A8DE;
+    --info-bg: #1C2733;
+    --neutral-bg: #282C32;
+    --code-bg: #14161A;
+    --panel-dark: #14161B;
+    --panel-dark-ink: #C9CDD4;
+    --panel-dark-line: #2C3038;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+  }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    background: linear-gradient(180deg, var(--band) 0%, var(--band-deep) 100%);
+    color: var(--band-ink);
+    border-bottom: 3px solid var(--gold);
+    padding: 40px 24px 30px;
+  }
+  .masthead-inner { max-width: 1080px; margin: 0 auto; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    opacity: .85;
+    margin: 0 0 10px;
+  }
+  .masthead h1 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-weight: 700;
+    font-size: clamp(30px, 5vw, 44px);
+    line-height: 1.12;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .masthead .sub {
+    font-size: 17px;
+    max-width: 62ch;
+    margin: 0 0 18px;
+    opacity: .92;
+  }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .meta-chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    padding: 3px 10px;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 3px;
+    background: rgba(0,0,0,.14);
+  }
+
+  /* ---------- Shell: sticky TOC + column ---------- */
+  .shell { max-width: 1080px; margin: 0 auto; padding: 0 24px 90px; display: block; }
+  @media (min-width: 1100px) {
+    .shell { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 44px; }
+  }
+  nav.toc { display: none; }
+  @media (min-width: 1100px) {
+    nav.toc { display: block; }
+    .toc-stick { position: sticky; top: 18px; padding-top: 34px; }
+    nav.toc h2 {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--faint); margin: 0 0 10px; font-weight: 500;
+    }
+    nav.toc ol { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.4; }
+    nav.toc li { margin: 0; }
+    nav.toc a {
+      display: flex; gap: 8px; padding: 4.5px 8px; color: var(--muted);
+      text-decoration: none; border-left: 2px solid var(--line); border-radius: 0 3px 3px 0;
+    }
+    nav.toc a:hover { color: var(--ink); background: var(--surface2); }
+    nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    nav.toc .n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: var(--faint); min-width: 16px; text-align: right; padding-top: 1px; }
+  }
+  main { min-width: 0; }
+
+  /* ---------- Sections and type ---------- */
+  section.doc { margin-top: 52px; }
+  section.doc > h2 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 27px; font-weight: 600; line-height: 1.2;
+    margin: 0 0 4px; padding-top: 14px;
+    border-top: 1px solid var(--line-strong);
+    text-wrap: balance;
+  }
+  section.doc > h2 .secnum {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 15px; font-weight: 500; color: var(--gold);
+    margin-right: 10px; vertical-align: 2px;
+  }
+  h3 {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    font-size: 19px; font-weight: 600; margin: 30px 0 4px; text-wrap: balance;
+  }
+  h4 { font-size: 15.5px; font-weight: 600; margin: 22px 0 4px; }
+  p { margin: 10px 0; max-width: 72ch; }
+  ul, ol { margin: 10px 0; padding-left: 26px; max-width: 70ch; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  strong { font-weight: 600; }
+  .lede { font-size: 17.5px; max-width: 68ch; }
+  .kw { font-weight: 600; letter-spacing: .01em; }
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .88em;
+  }
+  code { background: var(--code-bg); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; }
+  pre.code {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 5px;
+    padding: 14px 16px; overflow-x: auto; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.8px; line-height: 1.55; margin: 14px 0;
+  }
+  pre.code code { background: none; border: none; padding: 0; }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px;
+    padding: 14px 18px; margin: 18px 0; box-shadow: var(--shadow); max-width: none;
+  }
+  .callout .callout-tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--gold);
+    display: block; margin-bottom: 4px; font-weight: 500;
+  }
+  .callout p { max-width: none; margin: 6px 0; }
+
+  /* ---------- Glance strip ---------- */
+  .glance {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px; margin: 22px 0 6px;
+  }
+  .glance .cell {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 5px;
+    padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  .glance .k {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .12em; color: var(--faint); margin-bottom: 4px;
+  }
+  .glance .v { font-size: 14px; line-height: 1.45; }
+
+  /* ---------- Tables ---------- */
+  .tablewrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line-strong); border-radius: 5px; box-shadow: var(--shadow); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.8px; line-height: 1.5; }
+  caption {
+    caption-side: top; text-align: left; padding: 10px 14px 8px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--faint);
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    text-align: left; font-weight: 600; font-size: 12.4px;
+    text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+    background: var(--surface2); padding: 8px 14px; border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { font-variant-numeric: tabular-nums; }
+  td .mono { font-size: 12.3px; }
+
+  /* ---------- Pills ---------- */
+  .pill {
+    display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 1.5px 8px; border-radius: 999px; white-space: nowrap; font-weight: 500;
+  }
+  .pill.ok   { color: var(--ok);   background: var(--ok-bg); }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); }
+  .pill.crit { color: var(--crit); background: var(--crit-bg); }
+  .pill.info { color: var(--info); background: var(--info-bg); }
+  .pill.dim  { color: var(--muted); background: var(--neutral-bg); }
+
+  /* ---------- Requirements ---------- */
+  .reqs { margin: 14px 0 22px; border: 1px solid var(--line-strong); border-radius: 5px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+  .reqs .req {
+    display: grid; grid-template-columns: 110px minmax(0,1fr);
+    border-bottom: 1px solid var(--line);
+  }
+  .reqs .req:last-child { border-bottom: none; }
+  .reqs .rid {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--muted);
+    background: var(--surface2); padding: 9px 10px 9px 14px; border-right: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .reqs .rtx { padding: 8px 16px 8px 14px; font-size: 14.2px; }
+  @media (max-width: 560px) {
+    .reqs .req { grid-template-columns: 1fr; }
+    .reqs .rid { border-right: none; border-bottom: 1px dashed var(--line); padding: 6px 14px; }
+  }
+
+  /* ---------- Figures ---------- */
+  figure { margin: 22px 0; }
+  .figure-panel {
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px;
+    padding: 18px; overflow-x: auto; box-shadow: var(--shadow);
+  }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption {
+    font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 76ch;
+  }
+  figcaption .fig-n { font-family: "IBM Plex Mono", ui-monospace, monospace; color: var(--gold); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; margin-right: 6px; }
+  pre.mermaid { background: transparent; margin: 0; display: flex; justify-content: center; }
+
+  /* diagram text */
+  .dg { font-family: "IBM Plex Sans", Arial, sans-serif; font-size: 12.5px; }
+  .dg-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; }
+
+  /* ---------- Decision cards ---------- */
+  .decision {
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px;
+    margin: 18px 0; box-shadow: var(--shadow); overflow: hidden;
+  }
+  .decision .dhead {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface2);
+  }
+  .decision .did { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: var(--gold); font-weight: 500; }
+  .decision .dtitle { font-weight: 600; font-size: 15px; }
+  .decision .dbody { padding: 6px 16px 12px; font-size: 14.2px; }
+  .decision .dbody p { max-width: none; }
+
+  /* ---------- Mock UI ---------- */
+  .browser {
+    border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden;
+    box-shadow: var(--shadow); background: var(--surface); margin: 20px 0 8px;
+  }
+  .browser-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2); border-bottom: 1px solid var(--line);
+    padding: 8px 12px;
+  }
+  .bdots { display: flex; gap: 5px; }
+  .bdots span { width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); display: block; }
+  .burl {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
+    padding: 3px 10px; flex: 1; max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mock-scroll { overflow-x: auto; }
+  .mock { min-width: 1000px; font-size: 12px; line-height: 1.45; }
+  .mock * { max-width: none; }
+  .mock-mast {
+    background: linear-gradient(180deg, var(--band), var(--band-deep));
+    color: var(--band-ink); border-bottom: 2px solid var(--gold);
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 16px;
+  }
+  .mock-mast .t { font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600; font-size: 14.5px; }
+  .mock-mast .u { font-size: 11px; opacity: .9; display: flex; gap: 8px; align-items: center; }
+  .mock-mast .avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: #3A2A05; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+  .mock-cols { display: grid; grid-template-columns: 225px minmax(0,1fr) 265px; gap: 12px; padding: 12px 14px 16px; background: var(--paper); }
+  .mcard {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: var(--shadow); margin-bottom: 12px; overflow: hidden;
+  }
+  .mcard .mh {
+    font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); padding: 7px 11px; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  }
+  .mcard .mb { padding: 9px 11px; }
+  .kvrow { display: flex; justify-content: space-between; gap: 8px; padding: 2.5px 0; }
+  .kvrow .k { color: var(--muted); }
+  .kvrow .v { font-weight: 500; text-align: right; }
+  .attrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .attrow:last-child { border-bottom: none; }
+  .attrow .cl { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; }
+  .attrow .why { color: var(--muted); font-size: 10.5px; }
+  .chat-turns { display: flex; flex-direction: column; gap: 9px; padding: 11px; min-height: 330px; }
+  .bubble { border-radius: 8px; padding: 8px 12px; max-width: 92%; }
+  .bubble.user { align-self: flex-end; background: var(--info-bg); border: 1px solid var(--line); }
+  .bubble.agent { align-self: flex-start; background: var(--surface2); border: 1px solid var(--line); }
+  .bubble .who { font-size: 9.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin-bottom: 3px; font-weight: 600; }
+  .phase-line { align-self: flex-start; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; padding: 0 4px; }
+  .phase-line .tick { color: var(--ok); }
+  .report-card { border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; align-self: stretch; background: var(--surface); }
+  .report-card .rh {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    background: var(--surface2); border-bottom: 1px solid var(--line); padding: 7px 11px;
+    font-weight: 600; font-size: 11.5px;
+  }
+  .report-card .sec { display: flex; justify-content: space-between; gap: 8px; padding: 4.5px 11px; border-bottom: 1px solid var(--line); }
+  .report-card .sec:last-child { border-bottom: none; }
+  .report-card .sec .sn { color: var(--muted); }
+  .mock-input { display: flex; gap: 8px; border-top: 1px solid var(--line); padding: 9px 11px; background: var(--surface); }
+  .mock-input .field {
+    flex: 1; border: 1px solid var(--line-strong); border-radius: 5px; color: var(--faint);
+    padding: 6px 10px; background: var(--paper);
+  }
+  .mock-input .send { background: var(--band); color: var(--band-ink); border-radius: 5px; padding: 6px 14px; font-weight: 600; }
+  .log-panel { background: var(--panel-dark); color: var(--panel-dark-ink); border: 1px solid var(--panel-dark-line); border-radius: 6px; overflow: hidden; }
+  .log-panel .mh { color: #8A909A; border-bottom: 1px solid var(--panel-dark-line); padding: 7px 11px; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; display: flex; justify-content: space-between; }
+  .log-panel .lines { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; line-height: 1.75; padding: 9px 11px; white-space: nowrap; overflow-x: auto; }
+  .log-panel .ts { color: #6E7683; }
+  .log-panel .ok-t { color: #6FBF86; }
+  .log-panel .warn-t { color: #D9AE56; }
+  .log-panel .crit-t { color: #E57781; }
+  .log-panel .dim-t { color: #8A909A; }
+
+  /* ---------- Misc ---------- */
+  .filetree { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.6px; line-height: 1.7; }
+  .filetree .cm { color: var(--faint); }
+  .oq { counter-reset: oq; list-style: none; padding-left: 0; max-width: 76ch; }
+  .oq li {
+    counter-increment: oq; position: relative; padding: 10px 14px 10px 52px; margin: 8px 0;
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; box-shadow: var(--shadow);
+  }
+  .oq li::before {
+    content: "Q" counter(oq); position: absolute; left: 13px; top: 11px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: var(--gold); font-weight: 500;
+  }
+  footer.colophon {
+    margin-top: 70px; padding-top: 16px; border-top: 1px solid var(--line-strong);
+    font-size: 12.8px; color: var(--muted);
+  }
+  footer.colophon p { max-width: none; }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <p class="eyebrow">Product Requirements Document &middot; RFC-2119 keywords</p>
+    <h1>Cloud Operations Agent</h1>
+    <p class="sub">AI-assisted first-level triage for a fleet of hundreds of OpenShift clusters: attest the platform, resolve the user's context, run the Application 360 battery, then investigate.</p>
+    <div class="meta-row">
+      <span class="meta-chip">v0.1 draft</span>
+      <span class="meta-chip">2026-08-25</span>
+      <span class="meta-chip">status: for review</span>
+      <span class="meta-chip">owner: Aadesh</span>
+      <span class="meta-chip">7 open questions</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-stick">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#s1"><span class="n">1</span> Summary</a></li>
+      <li><a href="#s2"><span class="n">2</span> Goals &amp; non-goals</a></li>
+      <li><a href="#s3"><span class="n">3</span> Background</a></li>
+      <li><a href="#s4"><span class="n">4</span> Personas &amp; stories</a></li>
+      <li><a href="#s5"><span class="n">5</span> Architecture</a></li>
+      <li><a href="#s6"><span class="n">6</span> Key decisions</a></li>
+      <li><a href="#s7"><span class="n">7</span> Functional reqs</a></li>
+      <li><a href="#s8"><span class="n">8</span> Non-functional reqs</a></li>
+      <li><a href="#s9"><span class="n">9</span> Key flows</a></li>
+      <li><a href="#s10"><span class="n">10</span> Check catalogs</a></li>
+      <li><a href="#s11"><span class="n">11</span> Report formats</a></li>
+      <li><a href="#s12"><span class="n">12</span> Config plane</a></li>
+      <li><a href="#s13"><span class="n">13</span> Telemetry</a></li>
+      <li><a href="#s14"><span class="n">14</span> UI direction</a></li>
+      <li><a href="#s15"><span class="n">15</span> MVP scope</a></li>
+      <li><a href="#s16"><span class="n">16</span> Risks</a></li>
+      <li><a href="#s17"><span class="n">17</span> Open questions</a></li>
+      <li><a href="#s18"><span class="n">18</span> References</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main>
+
+<!-- ================================ 1 ================================ -->
+<section class="doc" id="s1">
+  <h2><span class="secnum">1</span>Summary</h2>
+  <p class="lede">The Cloud Operations Agent answers the question every application team asks first: <strong>&ldquo;is it my app, or is it the platform?&rdquo;</strong> It is a chat-driven triage system over a fleet of hundreds of OpenShift Container Platform (OCP) clusters, built so that the boring, load-bearing parts of triage are deterministic and only the judgment is left to the model.</p>
+  <p>Every conversation follows a fixed discipline. The system first <strong>attests the health of every in-scope cluster</strong> using a deterministic, configurable checklist. It then resolves <strong>who the user is, which applications they own, and where those applications actually run</strong>, discovered live from Prometheus rather than assumed. With context resolved, it automatically produces an <strong>Application 360 Report</strong>: a config-driven battery of checks rendered in the organization's standard 18-section format. Only then does the LLM take over for interactive investigation, grounded in the evidence the deterministic phases produced.</p>
+  <div class="glance">
+    <div class="cell"><div class="k">Shape</div><div class="v">Chat console + agent service (Google ADK, A2A) + MCP gateway + per-domain MCP servers</div></div>
+    <div class="cell"><div class="k">Triage discipline</div><div class="v">Attest &rarr; resolve context &rarr; Application 360 &rarr; grounded analysis</div></div>
+    <div class="cell"><div class="k">Extensibility</div><div class="v">New cloud domain = one MCP server + one config entry + optional checks/skills. No agent code changes</div></div>
+    <div class="cell"><div class="k">Local-first</div><div class="v">Ollama inference, mock fleet backends, zero external dependencies to demo</div></div>
+  </div>
+  <div class="callout">
+    <span class="callout-tag">Decision requested</span>
+    <p>This draft asks for review of the architecture (&sect;5), Decision <a href="#s6">D1</a> (where mandatory health attestation is enforced), and the seven open questions in <a href="#s17">&sect;17</a>. On approval, build phase M1 begins against the acceptance criteria in <a href="#s15">&sect;15</a>.</p>
+  </div>
+</section>
+
+<!-- ================================ 2 ================================ -->
+<section class="doc" id="s2">
+  <h2><span class="secnum">2</span>Goals and non-goals</h2>
+  <h3>Goals</h3>
+  <ol>
+    <li>Reduce time-to-first-signal for application teams from &ldquo;file a ticket and wait&rdquo; to under two minutes of self-service.</li>
+    <li>Make platform-vs-application attribution explicit and evidence-backed in every triage session.</li>
+    <li>Encode the organization's existing operations checklist (the 15-category checklist and the 18-section Application 360 report) as executable, configurable checks.</li>
+    <li>Prove an extensible architecture where cloud domains are pluggable MCP servers and agent behavior is editable configuration.</li>
+    <li>Run fully local for development: Ollama for inference, mock fleet backends, zero external dependencies.</li>
+  </ol>
+  <h3>Non-goals for the MVP</h3>
+  <ol>
+    <li><strong>No remediation actions.</strong> The MVP is strictly read-only diagnostics; write actions (restart, scale, rollback) need approval workflows and are a later phase.</li>
+    <li><strong>No real OAuth flow.</strong> Identity is client-supplied in dev; the JWT seam is designed in but not wired to a real IdP.</li>
+    <li><strong>No ticketing/ITSM integration</strong> (ServiceNow, incident enrichment). The design leaves seams for it.</li>
+    <li><strong>No multi-agent federation</strong> beyond the single triage agent, though A2A makes this a config change later.</li>
+    <li><strong>No fine-tuning.</strong> Model quality is a configuration choice.</li>
+  </ol>
+</section>
+
+<!-- ================================ 3 ================================ -->
+<section class="doc" id="s3">
+  <h2><span class="secnum">3</span>Background</h2>
+  <p>The platform organization operates hundreds of OCP clusters across regions and environments. First-level triage today is human: application teams either page platform SREs or file tickets for symptoms that are frequently platform noise (an upgrade in progress, a node drain, a degraded ingress operator) or self-inflicted application issues that a checklist would catch.</p>
+  <p>Two internal artifacts define the triage practice this product automates:</p>
+  <ul>
+    <li>A <strong>Detailed Operations Checklist</strong> covering 15 categories from application identity through supportability and readiness.</li>
+    <li>An <strong>OpenShift Application 360 Report Template</strong> with 18 sections: an executive summary, per-section fact tables, findings notes, recommendations, and a final assessment.</li>
+  </ul>
+  <p>The existing &ldquo;Platform Management&rdquo; agentic console establishes the UI language this product follows: a deep red masthead, a light card-grid dashboard (incidents, alerts, changes, observability, dependency map), an embedded AI Assistant chat, and a dark log explorer. This product adopts that visual language as themeable design tokens without depending on that platform (&sect;14).</p>
+  <p>Industry practice grounds the health attestation design: Red Hat's own troubleshooting order (ClusterVersion, ClusterOperators, nodes, MachineConfigPools, etcd, alerts), kubernetes-mixin alert rules with their hard-won false-positive guards, the Watchdog dead-man's-switch convention, and Google SRE's &ldquo;platform or app&rdquo; triage fork. Section <a href="#s10">10</a> carries the full catalog with sources.</p>
+</section>
+
+<!-- ================================ 4 ================================ -->
+<section class="doc" id="s4">
+  <h2><span class="secnum">4</span>Personas and user stories</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Persona</th><th>Description</th><th>Primary need</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ada</strong> &middot; app developer</td><td>Owns 1-2 applications, limited platform knowledge</td><td>&ldquo;My app is flaky in prod. Is it me or the platform? What do I tell my lead?&rdquo;</td></tr>
+      <tr><td><strong>Ravi</strong> &middot; SRE / platform</td><td>Supports many applications and clusters</td><td>Fast, evidence-dense state assessment; skip the basics; compare across clusters</td></tr>
+      <tr><td><strong>Nia</strong> &middot; new team member</td><td>No registered applications yet</td><td>Guided onboarding: what the agent needs and how to get registered</td></tr>
+      <tr><td>Ops manager</td><td>Consumes reports</td><td>Standard-format Application 360 reports for review meetings</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Representative stories</h3>
+  <ul>
+    <li>As Ada, I ask &ldquo;why is payments-api slow in prod&rdquo; and receive, without further prompting: a health verdict for each prod cluster running payments-api, an Application 360 report, and a concrete next step.</li>
+    <li>As Ravi, I ask about a cluster directly (&ldquo;attest prod-east-2&rdquo;) and get the attestation card plus what changed recently.</li>
+    <li>As Ada, when my app runs in two environments, the agent asks me <em>one</em> clarifying question with the options listed, not a wall of questions.</li>
+    <li>As an operator, I add a new check to the App 360 battery by editing a YAML file, and the very next report includes it, with no restart.</li>
+  </ul>
+</section>
+
+<!-- ================================ 5 ================================ -->
+<section class="doc" id="s5">
+  <h2><span class="secnum">5</span>System architecture</h2>
+  <figure>
+    <div class="figure-panel">
+      <svg viewBox="0 0 1340 640" role="img" aria-label="Component architecture: the console SPA talks to the BFF, which speaks A2A to the agent service; inside the agent, the orchestrator drives the check engine and analyst LLM; all tool traffic flows through the MCP gateway to the OpenShift and observability MCP servers; the config plane hot-reloads into every service" style="min-width:900px">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arrd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" opacity=".55"/>
+          </marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-width="1.3">
+          <!-- Browser -->
+          <rect x="30" y="150" width="190" height="86" rx="5"/>
+          <!-- BFF -->
+          <rect x="290" y="150" width="200" height="86" rx="5"/>
+          <!-- Agent group -->
+          <rect x="560" y="70" width="270" height="330" rx="6" stroke-dasharray="5 4" opacity=".65"/>
+          <rect x="585" y="112" width="220" height="46" rx="4"/>
+          <rect x="585" y="180" width="220" height="46" rx="4"/>
+          <rect x="585" y="248" width="220" height="46" rx="4"/>
+          <rect x="585" y="330" width="220" height="46" rx="4"/>
+          <!-- Ollama -->
+          <rect x="585" y="470" width="220" height="56" rx="4"/>
+          <!-- MCP servers -->
+          <rect x="1120" y="120" width="195" height="72" rx="5"/>
+          <rect x="1120" y="238" width="195" height="72" rx="5"/>
+          <!-- live backends -->
+          <rect x="1120" y="368" width="195" height="48" rx="5" stroke-dasharray="4 4" opacity=".6"/>
+          <rect x="1120" y="440" width="195" height="48" rx="5" stroke-dasharray="4 4" opacity=".6"/>
+          <!-- config plane -->
+          <rect x="290" y="560" width="540" height="52" rx="5" stroke-dasharray="5 4" opacity=".75"/>
+        </g>
+        <!-- Gateway: the one accent element (policy choke point) -->
+        <g fill="none" stroke="var(--accent)" stroke-width="1.8">
+          <rect x="900" y="150" width="180" height="120" rx="6"/>
+        </g>
+
+        <!-- main flow arrows -->
+        <g stroke="currentColor" stroke-width="1.3" fill="none">
+          <line x1="220" y1="193" x2="288" y2="193" marker-end="url(#arr)"/>
+          <line x1="490" y1="193" x2="583" y2="193" marker-end="url(#arr)"/>
+          <path d="M695,158 L695,180" marker-end="url(#arr)"/>
+          <path d="M695,226 L695,248" marker-end="url(#arr)"/>
+          <path d="M695,294 L695,330" marker-end="url(#arr)"/>
+          <path d="M805,271 L898,235" marker-end="url(#arr)"/>
+          <path d="M805,353 L898,255" marker-end="url(#arr)"/>
+          <path d="M695,376 L695,470" marker-end="url(#arr)"/>
+          <path d="M1080,180 L1118,164" marker-end="url(#arr)"/>
+          <path d="M1080,240 L1118,266" marker-end="url(#arr)"/>
+        </g>
+        <!-- dashed (live mode / reload) arrows -->
+        <g stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="4 4" opacity=".6">
+          <path d="M1315,160 L1330,160 L1330,392 L1317,392" marker-end="url(#arrd)"/>
+          <path d="M1217,310 L1217,438" marker-end="url(#arrd)"/>
+          <path d="M470,560 L390,240" marker-end="url(#arrd)"/>
+          <path d="M700,560 L695,402" marker-end="url(#arrd)"/>
+          <path d="M830,570 L990,272" marker-end="url(#arrd)"/>
+        </g>
+
+        <!-- labels -->
+        <g fill="currentColor" class="dg">
+          <text x="125" y="186" text-anchor="middle" font-weight="600">Ops Console SPA</text>
+          <text x="125" y="204" text-anchor="middle" opacity=".7" font-size="11.5">React + Vite</text>
+          <text x="390" y="180" text-anchor="middle" font-weight="600">Console BFF</text>
+          <text x="390" y="197" text-anchor="middle" opacity=".7" font-size="11.5">Express &middot; identity claims</text>
+          <text x="390" y="212" text-anchor="middle" opacity=".7" font-size="11.5">SSE relay &middot; OTel</text>
+          <text x="583" y="95" font-weight="600">Agent service</text>
+          <text x="700" y="95" opacity=".7" font-size="11.5">Python &middot; Google ADK</text>
+          <text x="695" y="140" text-anchor="middle">A2A endpoint</text>
+          <text x="695" y="204" text-anchor="middle">Triage orchestrator</text>
+          <text x="695" y="219" text-anchor="middle" font-size="10.5" opacity=".7">deterministic, config-driven</text>
+          <text x="990" y="196" text-anchor="middle" font-weight="600" fill="var(--accent)">MCP Gateway</text>
+          <text x="990" y="215" text-anchor="middle" opacity=".8" font-size="11.5">namespacing ocp__* obs__*</text>
+          <text x="990" y="231" text-anchor="middle" opacity=".8" font-size="11.5">allowlist &middot; audit &middot; timeout</text>
+          <text x="990" y="247" text-anchor="middle" opacity=".8" font-size="11.5">OTel span per call</text>
+          <text x="1217" y="150" text-anchor="middle" font-weight="600">OpenShift MCP</text>
+          <text x="1217" y="168" text-anchor="middle" opacity=".7" font-size="11.5">fleet resolver &middot; cluster state</text>
+          <text x="1217" y="268" text-anchor="middle" font-weight="600">Observability MCP</text>
+          <text x="1217" y="286" text-anchor="middle" opacity=".7" font-size="11.5">PromQL &middot; alerts &middot; Grafana</text>
+          <text x="1217" y="396" text-anchor="middle" opacity=".75" font-size="11.5">OCP fleet APIs (live)</text>
+          <text x="1217" y="468" text-anchor="middle" opacity=".75" font-size="11.5">Thanos / Prometheus (live)</text>
+          <text x="695" y="494" text-anchor="middle" font-weight="600">Ollama</text>
+          <text x="695" y="511" text-anchor="middle" opacity=".7" font-size="11.5">local inference &middot; LiteLLM bridge</text>
+          <text x="425" y="581" font-weight="600">Config plane (hot reload)</text>
+          <text x="425" y="598" opacity=".75" font-size="11.5">prompts &middot; skills &middot; checks &middot; fleet &middot; servers &middot; identities</text>
+        </g>
+        <!-- remaining component labels -->
+        <g fill="currentColor" class="dg">
+          <text x="695" y="273" text-anchor="middle">Check engine (checks.yaml)</text>
+          <text x="695" y="358" text-anchor="middle">Analyst LlmAgent</text>
+        </g>
+        <!-- arrow labels -->
+        <g fill="currentColor" class="dg-mono" opacity=".75">
+          <text x="254" y="184" text-anchor="middle">REST+SSE</text>
+          <text x="536" y="184" text-anchor="middle">A2A</text>
+          <text x="861" y="238" text-anchor="middle">MCP</text>
+          <text x="720" y="440" text-anchor="start">chat completions</text>
+          <text x="1099" y="158" text-anchor="middle">proxy</text>
+          <text x="1235" y="352" text-anchor="start">live mode</text>
+          <text x="472" y="430" text-anchor="middle">watch + reload</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fig-n">Figure 1</span>Component architecture. All tool traffic, deterministic or LLM-driven, converges on the MCP gateway (accented): the single policy, audit, and namespacing choke point. The config plane hot-reloads into every service; live-mode backends are dashed because mock backends stand in for them locally.</figcaption>
+  </figure>
+
+  <h3>5.1 Component responsibilities</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Component</th><th>Owns</th><th>Explicitly does not own</th></tr></thead>
+    <tbody>
+      <tr><td>Ops Console (React SPA)</td><td>Chat UX, report cards, context panel, activity log, dev identity picker</td><td>Business logic, direct MCP/agent access</td></tr>
+      <tr><td>Console BFF (Express)</td><td>Single origin for the SPA, A2A client, SSE normalization, identity claim injection, OTel for the web tier</td><td>Triage logic, tool execution</td></tr>
+      <tr><td>Agent service (ADK)</td><td>Conversation state, deterministic triage phases, check engine, LLM analysis loop, A2A surface</td><td>Tool implementations, cluster credentials</td></tr>
+      <tr><td>MCP Gateway</td><td>Server registry, tool namespacing (<span class="mono">ocp__*</span>, <span class="mono">obs__*</span>), allow/deny policy, per-call audit + telemetry, catalog refresh</td><td>Domain logic, check semantics, conversation state</td></tr>
+      <tr><td>OpenShift MCP</td><td>Fleet registry + cluster resolution, cluster/app state tools (mock and live backends)</td><td>Metric math, report logic</td></tr>
+      <tr><td>Observability MCP</td><td>PromQL/Thanos queries, firing alerts, app discovery by label, Grafana deep links</td><td>Cluster API access</td></tr>
+      <tr><td>Config plane</td><td>Prompts, routing, skills, check batteries, fleet registry, app registry, identities, gateway policy</td><td>Secrets (environment only)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>5.2 Technology stack</h3>
+  <div class="tablewrap"><table>
+    <caption>Versions verified against PyPI metadata and upstream source on 2026-08-25</caption>
+    <thead><tr><th>Layer</th><th>Choice</th><th>Pin</th></tr></thead>
+    <tbody>
+      <tr><td>Agent framework</td><td>Google ADK (Python)</td><td><span class="mono">google-adk==2.7.1</span> &middot; Python &ge; 3.10 (local 3.12)</td></tr>
+      <tr><td>Agent protocol</td><td>A2A via ADK <span class="mono">to_a2a()</span></td><td><span class="mono">a2a-sdk[http-server]==1.1.2</span> &middot; A2A 1.0 + 0.3 compat</td></tr>
+      <tr><td>Inference</td><td>Ollama via LiteLLM (<span class="mono">ollama_chat/&lt;model&gt;</span>)</td><td><span class="mono">litellm==1.98.0</span> &middot; default model <span class="mono">qwen3:4b</span></td></tr>
+      <tr><td>MCP</td><td>Official Python SDK</td><td><span class="mono">mcp</span> pinned to ADK's supported range; low-level <span class="mono">Server</span> for the gateway</td></tr>
+      <tr><td>Frontend</td><td>React + Vite SPA, Express BFF</td><td>Node 22 &middot; TypeScript</td></tr>
+      <tr><td>Telemetry</td><td>OpenTelemetry traces + structured logs</td><td>Python OTel <span class="mono">&lt;=1.42.1</span> (ADK constraint) &middot; OTel JS SDK</td></tr>
+      <tr><td>Packaging</td><td>uv (Python), npm workspaces (Node)</td><td>uv 0.8.x</td></tr>
+    </tbody>
+  </table></div>
+  <p>API facts the implementation relies on, verified against upstream source during research:</p>
+  <ul>
+    <li>ADK <code>LlmAgent.instruction</code> accepts a callable invoked per-request: the hot-reload mechanism for prompts.</li>
+    <li>ADK <code>McpToolset</code> supports streamable-HTTP connections plus a per-invocation <code>header_provider</code>, used to forward the thread id and user claims to the gateway.</li>
+    <li>A2A <code>contextId</code> maps directly to the ADK session id, giving durable per-thread state.</li>
+    <li>A2A request-level <code>params.metadata</code> surfaces in the agent via <code>RunConfig.custom_metadata</code>: the identity-claim channel.</li>
+    <li>The MCP SDK's low-level <code>Server</code> re-exposes downstream tools with original schemas verbatim: the verified gateway pattern.</li>
+  </ul>
+</section>
+
+<!-- ================================ 6 ================================ -->
+<section class="doc" id="s6">
+  <h2><span class="secnum">6</span>Key decisions</h2>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D1</span><span class="dtitle">Where does mandatory health attestation live?</span><span class="pill info">decision requested</span></div>
+    <div class="dbody">
+      <p>The product owner asked for a recommendation: hard-code the &ldquo;always attest first&rdquo; rule in the agent loop, or enforce it at the MCP gateway. Three placements were assessed; the diagram shows where enforcement sits in each.</p>
+      <figure>
+        <div class="figure-panel">
+          <svg viewBox="0 0 980 330" role="img" aria-label="Three options for enforcing attestation: option A relies on the prompt inside the LLM and is non-deterministic; option B places enforcement in the gateway, which lacks conversation state; option C, recommended, places a deterministic pre-phase in the agent runtime before the LLM" style="min-width:760px">
+            <defs>
+              <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+            </defs>
+            <!-- Row A -->
+            <g fill="none" stroke="currentColor" stroke-width="1.2">
+              <rect x="80" y="30" width="90" height="40" rx="4"/>
+              <rect x="230" y="30" width="150" height="40" rx="4" stroke-dasharray="4 3"/>
+              <rect x="440" y="30" width="110" height="40" rx="4"/>
+              <rect x="610" y="30" width="100" height="40" rx="4"/>
+              <line x1="170" y1="50" x2="228" y2="50" marker-end="url(#arr2)"/>
+              <line x1="380" y1="50" x2="438" y2="50" marker-end="url(#arr2)"/>
+              <line x1="550" y1="50" x2="608" y2="50" marker-end="url(#arr2)"/>
+            </g>
+            <g fill="currentColor" class="dg">
+              <text x="30" y="55" font-weight="600" class="dg-mono">A</text>
+              <text x="125" y="54" text-anchor="middle">User</text>
+              <text x="305" y="48" text-anchor="middle">LLM loop</text>
+              <text x="305" y="62" text-anchor="middle" font-size="10.5" opacity=".7">&ldquo;please attest first&rdquo;</text>
+              <text x="495" y="54" text-anchor="middle">Gateway</text>
+              <text x="660" y="54" text-anchor="middle">MCP tools</text>
+              <text x="745" y="48" font-size="12" fill="var(--crit)">rejected</text>
+              <text x="745" y="63" font-size="11" opacity=".75">prompt-only: unverifiable, model may skip or reorder</text>
+            </g>
+            <!-- Row B -->
+            <g fill="none" stroke="currentColor" stroke-width="1.2">
+              <rect x="80" y="130" width="90" height="40" rx="4"/>
+              <rect x="230" y="130" width="150" height="40" rx="4"/>
+              <rect x="440" y="130" width="110" height="40" rx="4" stroke-dasharray="4 3"/>
+              <rect x="610" y="130" width="100" height="40" rx="4"/>
+              <line x1="170" y1="150" x2="228" y2="150" marker-end="url(#arr2)"/>
+              <line x1="380" y1="150" x2="438" y2="150" marker-end="url(#arr2)"/>
+              <line x1="550" y1="150" x2="608" y2="150" marker-end="url(#arr2)"/>
+            </g>
+            <g fill="currentColor" class="dg">
+              <text x="30" y="155" font-weight="600" class="dg-mono">B</text>
+              <text x="125" y="154" text-anchor="middle">User</text>
+              <text x="305" y="154" text-anchor="middle">LLM loop</text>
+              <text x="495" y="148" text-anchor="middle">Gateway</text>
+              <text x="495" y="162" text-anchor="middle" font-size="10.5" opacity=".7">blocks until attested</text>
+              <text x="660" y="154" text-anchor="middle">MCP tools</text>
+              <text x="745" y="148" font-size="12" fill="var(--crit)">rejected</text>
+              <text x="745" y="163" font-size="11" opacity=".75">couples OpenShift semantics into the domain-agnostic</text>
+              <text x="745" y="177" font-size="11" opacity=".75">gateway; gateway lacks conversation state and scope</text>
+            </g>
+            <!-- Row C -->
+            <g fill="none" stroke="currentColor" stroke-width="1.2">
+              <rect x="80" y="240" width="90" height="40" rx="4"/>
+              <rect x="440" y="240" width="110" height="40" rx="4"/>
+              <rect x="610" y="240" width="100" height="40" rx="4"/>
+              <line x1="170" y1="260" x2="198" y2="260" marker-end="url(#arr2)"/>
+              <line x1="380" y1="260" x2="438" y2="260" marker-end="url(#arr2)"/>
+              <line x1="550" y1="260" x2="608" y2="260" marker-end="url(#arr2)"/>
+            </g>
+            <g fill="none" stroke="var(--accent)" stroke-width="1.8">
+              <rect x="200" y="234" width="180" height="52" rx="5"/>
+            </g>
+            <g fill="currentColor" class="dg">
+              <text x="30" y="265" font-weight="600" class="dg-mono">C</text>
+              <text x="125" y="264" text-anchor="middle">User</text>
+              <text x="290" y="253" text-anchor="middle" font-weight="600" fill="var(--accent)">Agent runtime</text>
+              <text x="290" y="268" text-anchor="middle" font-size="10.5">attest &rarr; 360 in code</text>
+              <text x="290" y="280" text-anchor="middle" font-size="10.5" opacity=".75">battery from checks.yaml</text>
+              <text x="495" y="264" text-anchor="middle">Gateway</text>
+              <text x="660" y="264" text-anchor="middle">MCP tools</text>
+              <text x="745" y="253" font-size="12" font-weight="600" fill="var(--ok)">recommended</text>
+              <text x="745" y="268" font-size="11" opacity=".75">deterministic and testable without an LLM; has full</text>
+              <text x="745" y="282" font-size="11" opacity=".75">conversation context; checks stay config-editable</text>
+            </g>
+            <!-- LLM after phase in row C -->
+            <g fill="currentColor" class="dg">
+              <text x="290" y="310" text-anchor="middle" font-size="11" opacity=".7">LLM analysis runs only after the deterministic phases complete</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><span class="fig-n">Figure 2</span>The same pipeline three times; only the enforcement point moves. Option C puts a coded, config-driven pre-phase in the agent runtime and keeps the gateway policy-neutral.</figcaption>
+      </figure>
+      <p><strong>Recommendation: Option C.</strong> The agent's root agent is a custom deterministic orchestrator (ADK <code>BaseAgent</code> subclass), not a bare LLM loop. Its <em>phases</em> (context resolution, attestation, Application 360, then LLM analysis) are code; the <em>content</em> of each phase (which checks, which tools, what thresholds) is configuration. The gateway still enforces cross-cutting guardrails (tool allowlists, timeouts, audit), which is its proper policy role. <strong>Revisit trigger:</strong> if multiple heterogeneous agents must share identical attestation semantics, promote the check engine into a shared library or a dedicated checks MCP server, not into the gateway.</p>
+    </div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D2</span><span class="dtitle">Gateway is a pure aggregation and policy plane</span></div>
+    <div class="dbody"><p>The gateway connects to N registered MCP servers (<code>servers.yaml</code>), re-exposes their tools namespaced as <code>&lt;prefix&gt;__&lt;tool&gt;</code> with schemas passed through verbatim, enforces allow/deny lists and timeouts, emits audit records and OTel spans per call, and refreshes catalogs on downstream <code>tools/list_changed</code>. It <span class="kw">MUST NOT</span> contain domain logic or conversation state. This is what makes &ldquo;add a cloud domain&rdquo; equal &ldquo;add an MCP server entry in config&rdquo;.</p></div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D3</span><span class="dtitle">Checks are data, not code</span></div>
+    <div class="dbody"><p>Both batteries (attestation, App 360) are YAML documents. A check names a gateway tool, templated arguments (<code>{{ cluster }}</code>, <code>{{ namespace }}</code>, <code>{{ app_label }}</code>), declarative evaluation rules over the tool's structured result (path, operator, threshold, verdict, reason), a severity, and an optional runbook URL. The check engine executes them deterministically and produces a typed report consumed by both the UI (report cards) and the LLM (narrative grounding). Adding, removing, or re-tuning a check is a hot-reloaded config edit.</p></div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D4</span><span class="dtitle">A2A is the agent boundary</span></div>
+    <div class="dbody"><p>The agent service is exposed exclusively over A2A (ADK <code>to_a2a()</code>). The BFF is an A2A client; the A2A <code>contextId</code> is the conversation thread id end to end (UI, logs, traces, ADK session). This buys protocol-standard streaming (status updates, artifacts), future multi-agent composition, and zero custom wire formats.</p></div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D5</span><span class="dtitle">Identity is client-derived, verified at the BFF seam</span></div>
+    <div class="dbody"><p>Dev mode: the console offers an identity picker over <code>identity/users.yaml</code>; the BFF stamps the selected user's claims into A2A request metadata. Production mode (designed, not built in MVP): the BFF validates an OAuth JWT (JWKS) and derives the same claim shape (<code>sub</code>, <code>email</code>, <code>groups</code>). The agent treats claims as trusted input from its BFF; the trust boundary and its hardening live in one place. User-to-application mapping resolves through the application registry by owner group; workload placement is always discovered live from Prometheus, never assumed from the registry.</p></div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D6</span><span class="dtitle">Mock-first backends with identical tool contracts</span></div>
+    <div class="dbody"><p>Every MCP tool has a mock backend (deterministic synthetic fleet with scripted faults, shared world-state between both servers) and a live backend (cluster APIs / Thanos), selected by <code>CLOUDOPS_BACKEND_MODE=mock|live</code>. Tool schemas and result shapes are identical in both modes, so the agent, checks, and UI cannot tell the difference. The MVP demos on a laptop; E2E tests are hermetic.</p></div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D7</span><span class="dtitle">Frontend is React + Vite</span><span class="pill warn">open question 1</span></div>
+    <div class="dbody"><p>&ldquo;Node frontend&rdquo; is satisfied by a React SPA served by the Express BFF. The SSOP prototype used Angular 20 + Material; if organizational alignment matters more than iteration speed, the BFF/A2A seam is framework-agnostic and the console can be rebuilt in Angular without touching any other component.</p></div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><span class="did">D8</span><span class="dtitle">Default model qwen3:4b; quality escalation is config</span></div>
+    <div class="dbody"><p><code>qwen3:4b</code> (installed) is the default for iteration speed; <code>gpt-oss:20b</code> (installed) is the recommended quality escalation; both support tool calling through the <code>ollama_chat</code> provider. Model, temperature, and loop budget live in <code>models.yaml</code>, hot-reloaded.</p></div>
+  </div>
+</section>
+
+<!-- ================================ 7 ================================ -->
+<section class="doc" id="s7">
+  <h2><span class="secnum">7</span>Functional requirements</h2>
+  <p>Keywords <span class="kw">MUST</span>, <span class="kw">MUST NOT</span>, <span class="kw">SHOULD</span>, and <span class="kw">MAY</span> per RFC 2119.</p>
+
+  <h3>7.1 Context resolution (FR-CTX)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-CTX-1</div><div class="rtx">The system <span class="kw">MUST</span> resolve, per conversation: user identity, candidate applications, and the clusters plus namespaces where those applications run.</div></div>
+    <div class="req"><div class="rid">FR-CTX-2</div><div class="rtx">Workload placement <span class="kw">MUST</span> be discovered by querying Prometheus label series (<code>kube_pod_labels</code> joined on the fleet <code>cluster</code> label), not read from static registry hints.</div></div>
+    <div class="req"><div class="rid">FR-CTX-3</div><div class="rtx">When context is unambiguous, the agent <span class="kw">MUST</span> proceed without asking questions.</div></div>
+    <div class="req"><div class="rid">FR-CTX-4</div><div class="rtx">When context is ambiguous (multiple applications or environments), the agent <span class="kw">MUST</span> ask exactly one clarifying question per turn, enumerating the options.</div></div>
+    <div class="req"><div class="rid">FR-CTX-5</div><div class="rtx">If the user has no registered applications, the agent <span class="kw">MUST</span> explain the registration path and <span class="kw">MAY</span> proceed on a user-named application.</div></div>
+    <div class="req"><div class="rid">FR-CTX-6</div><div class="rtx">Resolved context <span class="kw">MUST</span> be visible in a console panel (who, applications, clusters, namespaces) and stored in session state.</div></div>
+    <div class="req"><div class="rid">FR-CTX-7</div><div class="rtx">The user <span class="kw">MUST</span> be able to override resolved context conversationally (&ldquo;look at the dev instance instead&rdquo;).</div></div>
+  </div>
+
+  <h3>7.2 Cluster health attestation (FR-ATT)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-ATT-1</div><div class="rtx">Before any application-level analysis in a conversation, the agent runtime <span class="kw">MUST</span> execute the attestation battery against every in-scope cluster.</div></div>
+    <div class="req"><div class="rid">FR-ATT-2</div><div class="rtx">The battery <span class="kw">MUST</span> be defined in <code>config/checks/health_attestation.yaml</code> and hot-reload on save.</div></div>
+    <div class="req"><div class="rid">FR-ATT-3</div><div class="rtx">Each cluster attestation <span class="kw">MUST</span> produce a verdict from: <span class="pill ok">healthy</span> <span class="pill info">maintenance</span> <span class="pill crit">degraded</span> <span class="pill warn">unattestable</span>.</div></div>
+    <div class="req"><div class="rid">FR-ATT-4</div><div class="rtx">Maintenance detection <span class="kw">MUST</span> combine ClusterVersion <code>Progressing</code>, MachineConfigPool <code>Updating</code>/paused, and cordoned-node signals, so expected upgrade noise is not reported as failure.</div></div>
+    <div class="req"><div class="rid">FR-ATT-5</div><div class="rtx"><code>unattestable</code> <span class="kw">MUST</span> be returned when the monitoring pipeline itself cannot be trusted (Watchdog alert absent, monitoring operator degraded, or stale fleet metrics), and <span class="kw">MUST</span> be presented distinctly from <code>degraded</code>.</div></div>
+    <div class="req"><div class="rid">FR-ATT-6</div><div class="rtx">Attestation results <span class="kw">MUST</span> carry per-check evidence (tool, query, observed value, threshold, severity, optional runbook URL).</div></div>
+    <div class="req"><div class="rid">FR-ATT-7</div><div class="rtx">Attestation results <span class="kw">MUST</span> be cached per thread with a configurable TTL; the runtime <span class="kw">MUST</span> re-attest when stale before answering further questions.</div></div>
+    <div class="req"><div class="rid">FR-ATT-8</div><div class="rtx">The attestation <span class="kw">MUST</span> render in the console as a structured card (per-cluster verdict grid), independent of the LLM narrative.</div></div>
+  </div>
+
+  <h3>7.3 Application 360 report (FR-360)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-360-1</div><div class="rtx">Once context is resolved, the agent <span class="kw">MUST</span> automatically run the Application 360 battery (configurable off via <code>agent.auto_app360</code>).</div></div>
+    <div class="req"><div class="rid">FR-360-2</div><div class="rtx">The battery <span class="kw">MUST</span> be defined in <code>config/checks/app360.yaml</code>, organized in the organization's checklist categories, and hot-reload on save.</div></div>
+    <div class="req"><div class="rid">FR-360-3</div><div class="rtx">The rendered report <span class="kw">MUST</span> follow the organization's 18-section Application 360 template: executive summary, per-section fact tables, per-section findings, recommendations, final assessment.</div></div>
+    <div class="req"><div class="rid">FR-360-4</div><div class="rtx">Deterministic checks <span class="kw">MUST</span> populate all fact tables; the LLM <span class="kw">MUST</span> author only the narrative fields and <span class="kw">MUST</span> ground them in check results.</div></div>
+    <div class="req"><div class="rid">FR-360-5</div><div class="rtx">Overall status <span class="kw">MUST</span> map deterministically: any failed critical check yields <span class="pill crit">critical</span>; any failed or warning check yields <span class="pill warn">at risk</span>; otherwise <span class="pill ok">healthy</span>.</div></div>
+    <div class="req"><div class="rid">FR-360-6</div><div class="rtx">Sections whose data source is not yet automated <span class="kw">MUST</span> render as <code>manual</code> or <code>registry</code> sourced rather than silently disappearing.</div></div>
+    <div class="req"><div class="rid">FR-360-7</div><div class="rtx">The report <span class="kw">MUST</span> be exportable (Markdown download in MVP).</div></div>
+    <div class="req"><div class="rid">FR-360-8</div><div class="rtx">When the application runs in multiple in-scope instances (cluster, namespace pairs), the report <span class="kw">MUST</span> cover each instance or state which instance it covers.</div></div>
+  </div>
+
+  <h3>7.4 Conversation and analysis (FR-CHAT)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-CHAT-1</div><div class="rtx">After the deterministic phases, the agent <span class="kw">MUST</span> support free-form investigation using gateway tools through the LLM loop.</div></div>
+    <div class="req"><div class="rid">FR-CHAT-2</div><div class="rtx">The agent <span class="kw">MUST NOT</span> assert facts about fleet state that are not backed by a tool result from the current conversation.</div></div>
+    <div class="req"><div class="rid">FR-CHAT-3</div><div class="rtx">The agent <span class="kw">MUST</span> distinguish platform-attributable from application-attributable findings, and recommend escalation with an evidence list when platform-attributable.</div></div>
+    <div class="req"><div class="rid">FR-CHAT-4</div><div class="rtx">Responses <span class="kw">MUST</span> stream token-by-token, with phase/status updates surfaced during long operations.</div></div>
+    <div class="req"><div class="rid">FR-CHAT-5</div><div class="rtx">The tool loop <span class="kw">MUST</span> respect <code>agent.max_tool_iterations</code> per turn.</div></div>
+    <div class="req"><div class="rid">FR-CHAT-6</div><div class="rtx">The agent <span class="kw">MUST</span> be read-only; it <span class="kw">MUST NOT</span> claim to have performed mutations.</div></div>
+  </div>
+
+  <h3>7.5 MCP gateway (FR-GW)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-GW-1</div><div class="rtx">The gateway <span class="kw">MUST</span> aggregate N downstream MCP servers from <code>config/gateway/servers.yaml</code> behind one streamable-HTTP MCP endpoint.</div></div>
+    <div class="req"><div class="rid">FR-GW-2</div><div class="rtx">Tools <span class="kw">MUST</span> be namespaced <code>&lt;prefix&gt;__&lt;tool&gt;</code> with downstream input/output schemas passed through unmodified.</div></div>
+    <div class="req"><div class="rid">FR-GW-3</div><div class="rtx">The gateway <span class="kw">MUST</span> enforce per-server tool allowlists and a global denylist from config, refusing unlisted tools.</div></div>
+    <div class="req"><div class="rid">FR-GW-4</div><div class="rtx">The gateway <span class="kw">MUST</span> hot-reload the server registry: adding/enabling/disabling a server converges without restart.</div></div>
+    <div class="req"><div class="rid">FR-GW-5</div><div class="rtx">Every proxied call <span class="kw">MUST</span> produce an audit record (timestamp, thread id, tool, duration, outcome; arguments summarized with redaction) and an OTel span linked to the caller's trace.</div></div>
+    <div class="req"><div class="rid">FR-GW-6</div><div class="rtx">Downstream failures <span class="kw">MUST</span> return structured MCP tool errors, never crash the gateway session, and <span class="kw">MUST</span> be supervised with reconnect.</div></div>
+    <div class="req"><div class="rid">FR-GW-7</div><div class="rtx">Per-call timeout <span class="kw">MUST</span> be configurable; the gateway <span class="kw">MUST</span> cancel and report tools that exceed it.</div></div>
+  </div>
+
+  <h3>7.6 Domain MCP servers (FR-MCP)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-MCP-1</div><div class="rtx">The OpenShift MCP <span class="kw">MUST</span> expose a fleet resolver: given a name, alias, label selector, or fuzzy query, return matching cluster identities from the fleet registry, with paging suitable for hundreds of clusters.</div></div>
+    <div class="req"><div class="rid">FR-MCP-2</div><div class="rtx">Every cluster-scoped tool <span class="kw">MUST</span> take an explicit resolved cluster name; tools <span class="kw">MUST NOT</span> guess clusters.</div></div>
+    <div class="req"><div class="rid">FR-MCP-3</div><div class="rtx">The OpenShift MCP <span class="kw">MUST</span> expose (mock and live): cluster info/version, cluster operators, nodes, machine config pools, pending CSRs, namespace workloads with container states, recent warning events, quotas/limits, routes/services with TLS metadata, PVCs, and the application registry entry.</div></div>
+    <div class="req"><div class="rid">FR-MCP-4</div><div class="rtx">The observability MCP <span class="kw">MUST</span> expose (mock and live): instant and range PromQL, app placement discovery by label across the fleet, firing alerts (filterable, Watchdog visible), golden-signal summaries per workload, capacity summaries per cluster, and Grafana dashboard deep links.</div></div>
+    <div class="req"><div class="rid">FR-MCP-5</div><div class="rtx">All tools <span class="kw">MUST</span> return structured content designed for both rule-engine paths and LLM consumption (compact, pre-summarized where cardinality is high).</div></div>
+    <div class="req"><div class="rid">FR-MCP-6</div><div class="rtx">Mock backends <span class="kw">MUST</span> derive from one shared synthetic world state so both servers tell one consistent story.</div></div>
+    <div class="req"><div class="rid">FR-MCP-7</div><div class="rtx">Live backends <span class="kw">MUST</span> authenticate from environment/secret-store material only, never from committed config.</div></div>
+  </div>
+
+  <h3>7.7 Configuration plane (FR-CFG)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-CFG-1</div><div class="rtx">All prompts, routing instructions, skills, check batteries, fleet registry, application registry, identities, gateway policy, and model settings <span class="kw">MUST</span> live under <code>config/</code> as YAML or Markdown.</div></div>
+    <div class="req"><div class="rid">FR-CFG-2</div><div class="rtx">Config changes <span class="kw">MUST</span> take effect without service restarts: prompt files are re-read per LLM invocation; YAML registries reload on file-watch events.</div></div>
+    <div class="req"><div class="rid">FR-CFG-3</div><div class="rtx">Invalid config edits <span class="kw">MUST NOT</span> crash services: the last known good version stays active and the validation error is logged and surfaced.</div></div>
+    <div class="req"><div class="rid">FR-CFG-4</div><div class="rtx">Config <span class="kw">MUST NOT</span> contain secrets; secrets come from environment variables or a secret store and are referenced, not embedded.</div></div>
+    <div class="req"><div class="rid">FR-CFG-5</div><div class="rtx">Environment variable interpolation (<code>${VAR}</code> with defaults) <span class="kw">MUST</span> be supported in YAML config values.</div></div>
+  </div>
+
+  <h3>7.8 Console UI (FR-UI)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-UI-1</div><div class="rtx">The console <span class="kw">MUST</span> provide: a chat panel (streaming markdown), a context panel, an attestation card per cluster, the Application 360 report card, and an activity log of agent phases and tool calls.</div></div>
+    <div class="req"><div class="rid">FR-UI-2</div><div class="rtx">Structured cards <span class="kw">MUST</span> render from typed A2A artifacts (JSON parts), not parsed from LLM prose.</div></div>
+    <div class="req"><div class="rid">FR-UI-3</div><div class="rtx">Visual language <span class="kw">MUST</span> follow the established console direction (&sect;14) with all colors and fonts centralized as design tokens for rebranding.</div></div>
+    <div class="req"><div class="rid">FR-UI-4</div><div class="rtx">The dev identity picker <span class="kw">MUST</span> be visible only in dev mode.</div></div>
+    <div class="req"><div class="rid">FR-UI-5</div><div class="rtx">Clarification requests (A2A <code>input-required</code>) <span class="kw">MUST</span> render as normal chat turns with quick-pick options.</div></div>
+    <div class="req"><div class="rid">FR-UI-6</div><div class="rtx">The UI <span class="kw">MUST</span> remain a thin client: no triage logic, no direct MCP access.</div></div>
+  </div>
+
+  <h3>7.9 Identity (FR-ID)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">FR-ID-1</div><div class="rtx">The BFF <span class="kw">MUST</span> attach identity claims (<code>sub</code>, <code>name</code>, <code>email</code>, <code>groups</code>) to every A2A request as request-level metadata.</div></div>
+    <div class="req"><div class="rid">FR-ID-2</div><div class="rtx">In dev mode claims come from the identity picker backed by <code>config/identity/users.yaml</code>.</div></div>
+    <div class="req"><div class="rid">FR-ID-3</div><div class="rtx">The production seam <span class="kw">MUST</span> be a single BFF middleware that validates a bearer JWT against configurable JWKS and emits the same claim shape (implementation later; interface in MVP).</div></div>
+    <div class="req"><div class="rid">FR-ID-4</div><div class="rtx">The agent <span class="kw">MUST</span> treat absent or malformed claims as an unauthenticated session and respond with onboarding guidance instead of running checks.</div></div>
+  </div>
+</section>
+
+<!-- ================================ 8 ================================ -->
+<section class="doc" id="s8">
+  <h2><span class="secnum">8</span>Non-functional requirements</h2>
+
+  <h3>8.1 Observability (NFR-OBS)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">NFR-OBS-1</div><div class="rtx">All five services <span class="kw">MUST</span> emit OpenTelemetry traces; one user turn <span class="kw">MUST</span> form one distributed trace: console action, BFF relay, A2A handling, orchestrator phases, each check, each gateway hop, each MCP tool execution, each LLM call.</div></div>
+    <div class="req"><div class="rid">NFR-OBS-2</div><div class="rtx">The conversation thread id (A2A <code>contextId</code>) <span class="kw">MUST</span> be attached to every span as <code>thread.id</code> and propagated via W3C <code>traceparent</code> plus <code>baggage</code>, so a whole conversation is queryable in one filter.</div></div>
+    <div class="req"><div class="rid">NFR-OBS-3</div><div class="rtx">Logs <span class="kw">MUST</span> be structured (JSON in prod, pretty in dev) and <span class="kw">MUST</span> carry <code>trace_id</code>, <code>span_id</code>, and <code>thread.id</code> for log-trace correlation.</div></div>
+    <div class="req"><div class="rid">NFR-OBS-4</div><div class="rtx">Exporters <span class="kw">MUST</span> be optional: without <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>, services run with local-only tracing and full log correlation; with it, OTLP export works out of the box (compose file provides a collector plus Jaeger).</div></div>
+    <div class="req"><div class="rid">NFR-OBS-5</div><div class="rtx">Key operations <span class="kw">MUST</span> emit metrics-friendly span attributes: check id and verdict, tool name, model name, token counts where available, durations.</div></div>
+  </div>
+
+  <h3>8.2 Logging hygiene and secrets (NFR-LOG)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">NFR-LOG-1</div><div class="rtx">A shared redaction layer <span class="kw">MUST</span> scrub known secret patterns (bearer tokens, <code>Authorization</code> headers, kubeconfig contents, PEM blocks, password/token/key fields) from logs, audit records, and error messages in both Python and Node tiers.</div></div>
+    <div class="req"><div class="rid">NFR-LOG-2</div><div class="rtx">Stack traces <span class="kw">MUST NOT</span> be returned to clients; clients receive a correlation id plus a generic message, and the full trace goes to server logs at error level.</div></div>
+    <div class="req"><div class="rid">NFR-LOG-3</div><div class="rtx">Secret values <span class="kw">MUST NOT</span> appear in spans, span attributes, audit records, or check evidence; Kubernetes Secret tools return names and metadata only, never data.</div></div>
+    <div class="req"><div class="rid">NFR-LOG-4</div><div class="rtx">Log level <span class="kw">MUST</span> be config-driven per service (<code>CLOUDOPS_LOG_LEVEL</code>).</div></div>
+  </div>
+
+  <h3>8.3 Security (NFR-SEC)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">NFR-SEC-1</div><div class="rtx">MVP tool surface <span class="kw">MUST</span> be read-only against all backends.</div></div>
+    <div class="req"><div class="rid">NFR-SEC-2</div><div class="rtx">Live-mode credentials <span class="kw">MUST</span> come from environment/secret store; mock mode <span class="kw">MUST</span> require no credentials.</div></div>
+    <div class="req"><div class="rid">NFR-SEC-3</div><div class="rtx">The gateway allowlist <span class="kw">MUST</span> be the single choke point deciding which tools any agent can reach.</div></div>
+    <div class="req"><div class="rid">NFR-SEC-4</div><div class="rtx">Services <span class="kw">MUST</span> bind to localhost by default in dev.</div></div>
+    <div class="req"><div class="rid">NFR-SEC-5</div><div class="rtx">Tool results are data: the system prompt <span class="kw">MUST</span> instruct against executing instructions embedded in cluster data (pod names, annotations, log lines), and report rendering <span class="kw">MUST</span> escape all tool-derived strings.</div></div>
+  </div>
+
+  <h3>8.4 Performance (NFR-PERF)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">NFR-PERF-1</div><div class="rtx">Deterministic phases (attestation plus App 360, mock mode) <span class="kw">SHOULD</span> complete in under 10 seconds for a two-cluster scope, with checks executed concurrently per cluster.</div></div>
+    <div class="req"><div class="rid">NFR-PERF-2</div><div class="rtx">First streamed token <span class="kw">SHOULD</span> arrive within 2 seconds on <code>qwen3:4b</code>, with progress updates streaming during deterministic phases.</div></div>
+    <div class="req"><div class="rid">NFR-PERF-3</div><div class="rtx">Fleet resolution <span class="kw">MUST</span> stay responsive at 500 registered clusters (indexed in-memory registry).</div></div>
+  </div>
+
+  <h3>8.5 Extensibility (NFR-EXT)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">NFR-EXT-1</div><div class="rtx">Adding a cloud domain <span class="kw">MUST</span> require only: a new MCP server (any language), one <code>servers.yaml</code> entry, optional checks and one skill file; zero agent/gateway code changes.</div></div>
+    <div class="req"><div class="rid">NFR-EXT-2</div><div class="rtx">Check schema and report schema <span class="kw">MUST</span> be versioned with backward-compatible evolution.</div></div>
+    <div class="req"><div class="rid">NFR-EXT-3</div><div class="rtx">The A2A surface <span class="kw">MUST</span> remain standard so other clients (CLI, ChatOps) can attach without the console.</div></div>
+  </div>
+
+  <h3>8.6 Quality engineering (NFR-QE)</h3>
+  <div class="reqs">
+    <div class="req"><div class="rid">NFR-QE-1</div><div class="rtx">Python services <span class="kw">MUST</span> have unit tests for the check engine, config loader, redaction, and fleet resolver; an E2E test <span class="kw">MUST</span> run the full mock-mode triage flow headlessly.</div></div>
+    <div class="req"><div class="rid">NFR-QE-2</div><div class="rtx">Lint and type checks <span class="kw">MUST</span> pass clean (ruff + mypy for Python, eslint + tsc for Node).</div></div>
+    <div class="req"><div class="rid">NFR-QE-3</div><div class="rtx">Code <span class="kw">MUST</span> be commented for maintainers and coding agents: module headers stating role and seams, non-obvious constraints inline.</div></div>
+  </div>
+</section>
+
+<!-- ================================ 9 ================================ -->
+<section class="doc" id="s9">
+  <h2><span class="secnum">9</span>Key flows</h2>
+
+  <h3>9.1 First-contact triage</h3>
+  <figure>
+    <div class="figure-panel">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User (Ada)
+  participant C as Console SPA
+  participant B as BFF
+  participant A as Agent (ADK/A2A)
+  participant G as MCP Gateway
+  participant O as OpenShift MCP
+  participant P as Observability MCP
+  participant L as Ollama
+
+  U->>C: "Why is payments-api flaky in prod?"
+  C->>B: POST /api/chat/stream
+  B->>A: A2A SendStreamingMessage (claims in metadata, contextId)
+  A-->>B: status working: "Resolving context"
+  A->>G: ocp__get_app_registry_entry
+  G->>O: get_app_registry_entry
+  A->>G: obs__find_app_placements
+  G->>P: find_app_placements
+  Note over A: Context: payments-api, prod,<br/>clusters prod-east-1 + prod-east-2
+  A-->>B: status working: "Attesting 2 clusters"
+  loop per cluster, checks concurrent
+    A->>G: ocp__get_cluster_version / operators / nodes / mcpools
+    A->>G: obs__get_firing_alerts / capacity
+  end
+  A-->>B: artifact: attestation_report (JSON)
+  A-->>B: status working: "Running Application 360"
+  loop app360 battery
+    A->>G: ocp__get_workloads / events / quotas, obs__golden_signals
+  end
+  A-->>B: artifact: app360_report (JSON)
+  A->>L: narrative synthesis grounded in check JSON
+  L-->>A: streamed tokens
+  A-->>B: streamed message + final status
+  B-->>C: normalized SSE (status, cards, tokens)
+  C-->>U: attestation card, App 360 card, narrative
+      </pre>
+    </div>
+    <figcaption><span class="fig-n">Figure 3</span>First-contact triage. Steps 4-19 are the deterministic phases (code, not model); the LLM enters only at step 20, with the completed evidence in hand.</figcaption>
+  </figure>
+
+  <h3>9.2 Clarification on ambiguous context</h3>
+  <figure>
+    <div class="figure-panel">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User (Ravi, 6 apps)
+  participant A as Agent
+  U->>A: "Is my stuff healthy?"
+  A->>A: Context resolution finds 6 candidate apps
+  A-->>U: input-required: "Which application? 1 checkout, 2 loyalty, ..."
+  U->>A: "checkout, prod"
+  A->>A: Context resolved; attestation + App 360 proceed
+  A-->>U: Reports + narrative
+      </pre>
+    </div>
+    <figcaption><span class="fig-n">Figure 4</span>Ambiguity costs exactly one question (FR-CTX-4), delivered through the standard A2A input-required state.</figcaption>
+  </figure>
+
+  <h3>9.3 Follow-up with stale attestation</h3>
+  <figure>
+    <div class="figure-panel">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant A as Agent
+  participant G as Gateway
+  U->>A: (12 min later) "And what about memory usage?"
+  A->>A: Attestation age exceeds TTL (300 s)
+  A-->>U: status: "Re-attesting prod-east-1, prod-east-2"
+  A->>G: attestation battery (changes noted)
+  A->>G: obs__query: container memory vs limits
+  A-->>U: Answer, prefixed with any attestation change
+      </pre>
+    </div>
+    <figcaption><span class="fig-n">Figure 5</span>The always-attest rule holds across the whole conversation, not just the first turn (FR-ATT-7).</figcaption>
+  </figure>
+
+  <h3>9.4 Config hot reload</h3>
+  <figure>
+    <div class="figure-panel">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Hot reload has two paths: YAML files go through a watcher and schema validation, swapping atomically on success and keeping last known good on failure; Markdown prompts are simply re-read at every LLM invocation" style="min-width:700px">
+        <defs>
+          <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="20" y="40" width="185" height="52" rx="4"/>
+          <rect x="265" y="40" width="120" height="52" rx="4"/>
+          <path d="M445,66 L505,36 L565,66 L505,96 Z"/>
+          <rect x="640" y="14" width="240" height="46" rx="4"/>
+          <rect x="640" y="82" width="240" height="46" rx="4" stroke-dasharray="4 3"/>
+          <line x1="205" y1="66" x2="263" y2="66" marker-end="url(#arr3)"/>
+          <line x1="385" y1="66" x2="443" y2="66" marker-end="url(#arr3)"/>
+          <line x1="565" y1="52" x2="638" y2="40" marker-end="url(#arr3)"/>
+          <line x1="565" y1="80" x2="638" y2="102" marker-end="url(#arr3)"/>
+          <rect x="20" y="170" width="185" height="52" rx="4"/>
+          <rect x="380" y="170" width="300" height="52" rx="4"/>
+          <line x1="205" y1="196" x2="378" y2="196" marker-end="url(#arr3)"/>
+        </g>
+        <g fill="currentColor" class="dg">
+          <text x="112" y="61" text-anchor="middle" font-size="11.5" opacity=".75">operator edits</text>
+          <text x="112" y="78" text-anchor="middle" class="dg-mono">checks/app360.yaml</text>
+          <text x="325" y="61" text-anchor="middle">file watcher</text>
+          <text x="325" y="77" text-anchor="middle" font-size="11" opacity=".7">agent service</text>
+          <text x="505" y="70" text-anchor="middle" font-size="11.5">schema valid?</text>
+          <text x="760" y="33" text-anchor="middle" font-size="12">atomic swap; next report uses it</text>
+          <text x="760" y="49" text-anchor="middle" font-size="11" opacity=".7">log config.reload</text>
+          <text x="760" y="101" text-anchor="middle" font-size="12">keep last known good</text>
+          <text x="760" y="117" text-anchor="middle" font-size="11" opacity=".7">surface validation error (FR-CFG-3)</text>
+          <text x="596" y="34" class="dg-mono" opacity=".75">yes</text>
+          <text x="596" y="102" class="dg-mono" opacity=".75">no</text>
+          <text x="112" y="191" text-anchor="middle" font-size="11.5" opacity=".75">operator edits</text>
+          <text x="112" y="208" text-anchor="middle" class="dg-mono">system_prompt.md</text>
+          <text x="530" y="191" text-anchor="middle" font-size="12">no watcher needed: InstructionProvider</text>
+          <text x="530" y="208" text-anchor="middle" font-size="12">re-reads the file at every LLM call</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fig-n">Figure 6</span>Two reload paths. Structured YAML is validated before it is swapped in; prose prompts need no machinery at all because they are read on every invocation.</figcaption>
+  </figure>
+
+  <h3>9.5 Fleet cluster resolution</h3>
+  <figure>
+    <div class="figure-panel">
+      <pre class="mermaid">
+flowchart LR
+  Q["query: name, alias,<br/>label, or fuzzy text"] --> RES["ocp__resolve_cluster"]
+  RES --> REG[("fleet.yaml registry<br/>indexed, 100s of clusters")]
+  REG --> M{matches}
+  M -- "exactly 1" --> ONE["resolved cluster identity"]
+  M -- several --> LIST["ranked candidates:<br/>agent filters or asks"]
+  M -- none --> NONE["not found +<br/>nearest names"]
+      </pre>
+    </div>
+    <figcaption><span class="fig-n">Figure 7</span>Every cluster-scoped tool requires an explicitly resolved cluster (FR-MCP-2); resolution is its own tool so the fleet of hundreds stays navigable by name, alias, label, or fuzzy match.</figcaption>
+  </figure>
+</section>
+
+<!-- ================================ 10 ================================ -->
+<section class="doc" id="s10">
+  <h2><span class="secnum">10</span>Check catalogs</h2>
+  <p>Defaults grounded in Red Hat troubleshooting order, kubernetes-mixin rules, and OpenShift runbooks; every check carries evidence and a runbook URL in config. Full source list in <a href="#s18">&sect;18</a>.</p>
+
+  <h3>10.1 Cluster health attestation battery</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th class="num">#</th><th>Check</th><th>Source of truth</th><th>Healthy criteria</th><th>On breach</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>API reachability</td><td>cluster info tool</td><td>API responds</td><td><span class="pill crit">fail critical</span></td></tr>
+      <tr><td class="num">2</td><td>ClusterVersion</td><td><span class="mono">Available / Progressing / Failing</span></td><td>Available, not Failing; Progressing implies maintenance</td><td><span class="pill crit">fail</span> <span class="pill info">maintenance</span></td></tr>
+      <tr><td class="num">3</td><td>ClusterOperators</td><td>per-operator <span class="mono">Available / Progressing / Degraded</span></td><td>none Degraded, all Available; etcd, kube-apiserver, ingress, dns, authentication, monitoring weighted critical</td><td><span class="pill crit">fail</span> <span class="pill warn">warn</span></td></tr>
+      <tr><td class="num">4</td><td>Nodes</td><td><span class="mono">Ready</span>, pressure conditions, <span class="mono">unschedulable</span></td><td>all Ready, no pressure; cordoned counts as maintenance signal</td><td><span class="pill crit">fail</span> <span class="pill warn">warn</span> <span class="pill info">maintenance</span></td></tr>
+      <tr><td class="num">5</td><td>MachineConfigPools</td><td><span class="mono">Updated / Updating / Degraded</span>, paused</td><td>Updated, not Degraded; Updating implies maintenance; long-paused warns</td><td><span class="pill crit">fail</span> <span class="pill warn">warn</span> <span class="pill info">maintenance</span></td></tr>
+      <tr><td class="num">6</td><td>etcd</td><td>operator conditions + alerts (<span class="mono">etcdNoLeader</span>, fsync durations, members)</td><td>leader present, quorum, no fsync alerts</td><td><span class="pill crit">fail critical</span></td></tr>
+      <tr><td class="num">7</td><td>Firing alerts</td><td><span class="mono">ALERTS{alertstate="firing"}</span></td><td>zero critical (Watchdog excluded from breaches)</td><td><span class="pill crit">fail</span> <span class="pill warn">warn</span> by severity</td></tr>
+      <tr><td class="num">8</td><td>Watchdog present</td><td><span class="mono">ALERTS{alertname="Watchdog"}</span></td><td>firing (dead man's switch)</td><td><span class="pill warn">unattestable</span> if absent</td></tr>
+      <tr><td class="num">9</td><td>API server SLO</td><td>error rate / burn rate PromQL</td><td>5xx ratio under threshold</td><td><span class="pill warn">warn</span> <span class="pill crit">fail</span></td></tr>
+      <tr><td class="num">10</td><td>Capacity</td><td>requests vs allocatable (CPU, memory), pod count vs capacity</td><td>fits allocatable minus one node (overcommit guard)</td><td><span class="pill warn">warn</span></td></tr>
+      <tr><td class="num">11</td><td>Pending CSRs</td><td>CSR list</td><td>zero pending</td><td><span class="pill warn">warn</span></td></tr>
+      <tr><td class="num">12</td><td>Cert expiry signals</td><td>cert expiration alerts</td><td>none</td><td><span class="pill warn">warn</span> <span class="pill crit">fail</span></td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Verdict precedence per cluster:</strong> any unattestable signal caps confidence and is reported first; else any critical fail yields <span class="pill crit">degraded</span>; else maintenance signals yield <span class="pill info">maintenance</span>; else <span class="pill ok">healthy</span>. False-positive guards from kubernetes-mixin (rollout-in-progress guards, Jobs excluded from pod checks, HPA at min==max excluded) are encoded in the default rules.</p>
+
+  <h3>10.2 Application 360 battery, mapped to the 18-section template</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Template section</th><th>Data source</th><th>MVP automation</th></tr></thead>
+    <tbody>
+      <tr><td>1. Executive summary</td><td>LLM narrative over all checks</td><td><span class="pill ok">automated</span> narrative</td></tr>
+      <tr><td>2. Application identity</td><td>application registry + resolved context</td><td><span class="pill ok">automated</span> registry</td></tr>
+      <tr><td>3. Deployment overview</td><td><span class="mono">ocp__get_workloads</span>: replicas, strategy, images, rollout, age</td><td><span class="pill ok">automated</span></td></tr>
+      <tr><td>4. Runtime health</td><td>pod states, waiting/terminated reasons, restarts, probes, usage vs limits</td><td><span class="pill ok">automated</span></td></tr>
+      <tr><td>5. Configuration</td><td>ConfigMap/Secret names (names only), env source refs, mounts</td><td><span class="pill ok">automated</span> metadata only</td></tr>
+      <tr><td>6. Networking</td><td>services, routes, TLS termination, NetworkPolicy presence, DNS status</td><td><span class="pill warn">partial</span></td></tr>
+      <tr><td>7. Storage and data</td><td>PVC binding, capacity usage, growth trend; backup fields from registry</td><td><span class="pill ok">automated</span> + registry</td></tr>
+      <tr><td>8. Security posture</td><td>ServiceAccount, SCC/PSA flags, route TLS cert expiry</td><td><span class="pill warn">partial</span>; image vulns manual</td></tr>
+      <tr><td>9. Observability</td><td>firing alerts, error rate, latency, dashboards, log availability</td><td><span class="pill ok">automated</span></td></tr>
+      <tr><td>10. Dependency health</td><td>registry-declared dependencies + reachability signals where measurable</td><td><span class="pill dim">registry</span> + partial</td></tr>
+      <tr><td>11. Cluster and platform context</td><td>attestation summary for hosting cluster, quotas, scheduling pressure</td><td><span class="pill ok">automated</span> reuses attestation</td></tr>
+      <tr><td>12. Capacity and performance</td><td>requests vs limits vs usage, throttling, HPA state</td><td><span class="pill ok">automated</span></td></tr>
+      <tr><td>13. Release and change history</td><td>rollout history, image digest change times</td><td><span class="pill warn">partial</span>; no ITSM in MVP</td></tr>
+      <tr><td>14. Reliability and recovery</td><td>PDB status; RPO/RTO and backup policy from registry</td><td><span class="pill dim">registry</span> + partial</td></tr>
+      <tr><td>15. Operational risks</td><td>derived: expiring certs; deprecated APIs flagged manual</td><td><span class="pill warn">partial</span></td></tr>
+      <tr><td>16. Supportability and ownership</td><td>registry: owners, on-call, runbooks, escalation</td><td><span class="pill ok">automated</span> registry</td></tr>
+      <tr><td>17. Recommendations</td><td>LLM narrative, grounded in checks</td><td><span class="pill ok">automated</span> narrative</td></tr>
+      <tr><td>18. Final assessment</td><td>deterministic status mapping + LLM reason</td><td><span class="pill ok">automated</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================================ 11 ================================ -->
+<section class="doc" id="s11">
+  <h2><span class="secnum">11</span>Report formats</h2>
+  <p>The Application 360 Report renders exactly in the organization's template structure: an executive summary block (application, namespace, cluster, environment, owners, report date, overall status pill, 1-3 sentence summary), one fact table per section (<span class="mono">Item | Value</span> with status pills), a findings note per section, numbered recommendations, and a final assessment (status, reason, next review date).</p>
+  <p>The attestation card renders one row per cluster: verdict pill, the failing or maintenance signals, and timestamps. Narrative text in chat follows the incident-summary idiom from the existing console: <strong>Summary, Impact Assessment, Root Cause Indicators, Next Steps</strong>.</p>
+  <p>All three are delivered as typed JSON artifacts over A2A and rendered client-side; Markdown export mirrors the same structure (FR-360-7).</p>
+</section>
+
+<!-- ================================ 12 ================================ -->
+<section class="doc" id="s12">
+  <h2><span class="secnum">12</span>Configuration plane</h2>
+  <pre class="code"><code class="filetree">config/
+  models.yaml                  <span class="cm"># inference + agent loop tuning</span>
+  agent/
+    agent.yaml                 <span class="cm"># prompt composition, skill toggles, context policy</span>
+    system_prompt.md           <span class="cm"># persona and hard rules</span>
+    routing.md                 <span class="cm"># the triage flow contract</span>
+    skills/                    <span class="cm"># focused how-to blocks, hot-toggleable</span>
+      cluster-health-triage.md
+      app360-analysis.md
+      prometheus-query-crafting.md
+    templates/
+      app360_report.md         <span class="cm"># 18-section render template</span>
+  checks/
+    health_attestation.yaml    <span class="cm"># battery: tools, args, rules, severities, runbooks</span>
+    app360.yaml                <span class="cm"># battery grouped by template sections</span>
+  gateway/
+    servers.yaml               <span class="cm"># registered MCP servers, prefixes, allowlists, timeouts</span>
+  fleet/
+    fleet.yaml                 <span class="cm"># cluster registry (+ synthetic generator for scale tests)</span>
+    applications.yaml          <span class="cm"># app registry: owners, labels, SLO, runbooks</span>
+  identity/
+    users.yaml                 <span class="cm"># dev personas (JWT claim shape)</span>
+  mock/
+    scenario.yaml              <span class="cm"># mock world: placements and scripted faults</span></code></pre>
+  <p><strong>Hot-reload semantics:</strong> Markdown prompt files are re-read at each LLM invocation; YAML files are watched and atomically swapped after schema validation; invalid edits keep last-known-good and surface the error (FR-CFG-3, Figure 6). Secrets never live here (FR-CFG-4); values support <code>${VAR}</code> interpolation (FR-CFG-5).</p>
+</section>
+
+<!-- ================================ 13 ================================ -->
+<section class="doc" id="s13">
+  <h2><span class="secnum">13</span>Telemetry specification</h2>
+  <p>One user turn forms one distributed trace. Span model (names illustrative):</p>
+  <pre class="code"><code>console.turn                                (SPA)
+  bff.chat_stream                           thread.id=ctx-42  user.sub=ada
+    a2a.send_streaming_message
+      agent.orchestrate
+        agent.phase.context_resolution
+          gateway.call ocp__resolve_cluster
+            mcp.tool resolve_cluster
+        agent.phase.attestation             cluster=prod-east-2
+          check.run id=cluster-operators    verdict=fail
+            gateway.call ocp__get_cluster_operators
+        agent.phase.app360 ...
+        agent.phase.narrative
+          llm.generate                      model=ollama/qwen3:4b</code></pre>
+  <p><strong>Propagation:</strong> W3C <code>traceparent</code> at every HTTP hop (BFF to A2A; agent to gateway via <code>McpToolset</code> headers; gateway to MCP servers); <code>baggage</code> carries <code>thread.id</code> and <code>user.sub</code> so leaf services log them without plumbing.</p>
+  <p><strong>Logs:</strong> structlog (Python) and pino (Node), JSON in prod, both injected with <code>trace_id</code>/<code>span_id</code>/<code>thread.id</code>; the gateway additionally writes an audit stream. ADK's built-in GenAI spans are enabled via its OTel setup hook; Python OTel is pinned <code>&lt;=1.42.1</code> per ADK constraint.</p>
+</section>
+
+<!-- ================================ 14 ================================ -->
+<section class="doc" id="s14">
+  <h2><span class="secnum">14</span>UI design direction</h2>
+  <p>Desktop-first, following the established console language from the reference screenshots: deep red masthead with a gold rule, light card grid, status pills, and a dark monospace log panel. All colors, spacing, and type ship as CSS design tokens in one file; rebranding is a token edit. No proprietary marks or assets are used.</p>
+
+  <figure>
+    <div class="browser">
+      <div class="browser-bar">
+        <div class="bdots"><span></span><span></span><span></span></div>
+        <div class="burl">localhost:5173 &middot; Cloud Operations Agent</div>
+      </div>
+      <div class="mock-scroll"><div class="mock">
+        <div class="mock-mast">
+          <span class="t">Cloud Operations Agent</span>
+          <span class="u"><span class="pill dim">dev identity</span> Ada Okafor &middot; payments-eng <span class="avatar">AO</span></span>
+        </div>
+        <div class="mock-cols">
+          <div>
+            <div class="mcard">
+              <div class="mh">Context</div>
+              <div class="mb">
+                <div class="kvrow"><span class="k">User</span><span class="v">Ada Okafor</span></div>
+                <div class="kvrow"><span class="k">Team</span><span class="v">payments-eng</span></div>
+                <div class="kvrow"><span class="k">Application</span><span class="v mono">payments-api</span></div>
+                <div class="kvrow"><span class="k">Environment</span><span class="v">prod</span></div>
+                <div class="kvrow"><span class="k">Namespaces</span><span class="v mono">payments-prod</span></div>
+              </div>
+            </div>
+            <div class="mcard">
+              <div class="mh">Cluster attestation <span class="pill dim">38s ago</span></div>
+              <div class="mb">
+                <div class="attrow">
+                  <div><div class="cl">prod-east-1</div><div class="why">all 12 checks passed</div></div>
+                  <span class="pill ok">healthy</span>
+                </div>
+                <div class="attrow">
+                  <div><div class="cl">prod-east-2</div><div class="why">ingress operator degraded; MCP worker updating 2/6</div></div>
+                  <span class="pill crit">degraded</span>
+                </div>
+              </div>
+            </div>
+            <div class="mcard">
+              <div class="mh">Checks</div>
+              <div class="mb">
+                <div class="kvrow"><span class="k">Attestation battery</span><span class="v">12 checks</span></div>
+                <div class="kvrow"><span class="k">App 360 battery</span><span class="v">31 checks</span></div>
+                <div class="kvrow"><span class="k">Config version</span><span class="v mono">a41c9e2</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mcard" style="margin-bottom:0; display:flex; flex-direction:column;">
+            <div class="mh">AI Assistant <span class="pill info">streaming</span></div>
+            <div class="chat-turns">
+              <div class="bubble user"><div class="who">Ada</div>Why is payments-api flaky in prod?</div>
+              <div class="phase-line"><span class="tick">&#10003;</span> Context resolved &middot; payments-api &middot; 2 clusters</div>
+              <div class="phase-line"><span class="tick">&#10003;</span> Health attestation &middot; prod-east-1, prod-east-2 &middot; 3.1s</div>
+              <div class="phase-line"><span class="tick">&#10003;</span> Application 360 &middot; 31 checks &middot; 4.6s</div>
+              <div class="report-card">
+                <div class="rh"><span>Application 360 &middot; payments-api &middot; payments-prod @ prod-east-2</span><span class="pill warn">at risk</span></div>
+                <div class="sec"><span class="sn">3. Deployment overview</span><span class="pill ok">healthy</span></div>
+                <div class="sec"><span class="sn">4. Runtime health &middot; 7 restarts, OOMKilled x2</span><span class="pill crit">failing</span></div>
+                <div class="sec"><span class="sn">11. Platform context &middot; host cluster degraded</span><span class="pill warn">warning</span></div>
+                <div class="sec"><span class="sn">12. Capacity &middot; memory limit 512Mi, p95 at 497Mi</span><span class="pill warn">warning</span></div>
+                <div class="sec"><span class="sn">14 more sections</span><span class="pill dim">expand</span></div>
+              </div>
+              <div class="bubble agent"><div class="who">Agent</div><strong>Summary:</strong> Two overlapping causes. Your pods are OOMKilled under load (memory limit 512Mi, p95 usage 497Mi), and prod-east-2 is mid node-maintenance with a degraded ingress operator, which is amplifying restarts into visible flakiness. <strong>Next step:</strong> raise the memory limit toward 768Mi and re-check after the platform's ingress recovery; escalation is not warranted yet&hellip;</div>
+            </div>
+            <div class="mock-input"><div class="field">Ask a follow-up&hellip;</div><div class="send">Send</div></div>
+          </div>
+
+          <div>
+            <div class="log-panel">
+              <div class="mh">Activity log <span>ctx-42</span></div>
+              <div class="lines">
+<span class="ts">14:02:11.204</span> <span class="dim-t">phase</span> context_resolution start<br>
+<span class="ts">14:02:11.239</span> <span class="dim-t">tool</span>  ocp__resolve_cluster 34ms<br>
+<span class="ts">14:02:11.418</span> <span class="dim-t">tool</span>  obs__find_app_placements 176ms<br>
+<span class="ts">14:02:11.420</span> <span class="ok-t">ok</span>    context payments-api prod<br>
+<span class="ts">14:02:11.421</span> <span class="dim-t">phase</span> attestation start n=2<br>
+<span class="ts">14:02:12.077</span> <span class="ok-t">pass</span>  cluster-version prod-east-1<br>
+<span class="ts">14:02:12.310</span> <span class="crit-t">fail</span>  cluster-operators prod-east-2<br>
+<span class="ts">14:02:12.312</span> <span class="warn-t">maint</span> mcpools prod-east-2 2/6<br>
+<span class="ts">14:02:14.529</span> <span class="dim-t">phase</span> app360 start checks=31<br>
+<span class="ts">14:02:15.881</span> <span class="crit-t">fail</span>  pod-restarts payments-api<br>
+<span class="ts">14:02:19.167</span> <span class="dim-t">phase</span> narrative model=qwen3:4b<br>
+<span class="ts">14:02:19.905</span> <span class="dim-t">llm</span>   first token 738ms
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <figcaption><span class="fig-n">Figure 8</span>Static mock of the console MVP: red masthead, context and attestation cards (left), chat with phase ticks and the typed Application 360 report card (center), dark activity log keyed by thread id (right). Built from the same design tokens the SPA will ship with.</figcaption>
+  </figure>
+
+  <h3>Layout regions</h3>
+  <ul>
+    <li><strong>Masthead:</strong> product title, signed-in identity, dev identity picker (dev only), gold rule beneath.</li>
+    <li><strong>Left rail:</strong> context card, cluster attestation card with verdict pills, check battery versions.</li>
+    <li><strong>Center:</strong> AI Assistant chat: streaming markdown, phase ticks, clarification quick-picks, report cards inline.</li>
+    <li><strong>Right:</strong> activity log (dark, monospace, phase and tool-call lines, thread id); expandable Application 360 panel.</li>
+    <li><strong>Status pills everywhere:</strong> <span class="pill ok">healthy</span> <span class="pill info">maintenance / in progress</span> <span class="pill warn">warning / unattestable</span> <span class="pill crit">degraded / critical</span> <span class="pill dim">unknown / manual</span></li>
+  </ul>
+</section>
+
+<!-- ================================ 15 ================================ -->
+<section class="doc" id="s15">
+  <h2><span class="secnum">15</span>MVP scope</h2>
+  <h3>In scope</h3>
+  <ol>
+    <li>Full mock-mode E2E: console, BFF, agent (ADK + A2A), gateway, two MCP servers, Ollama inference.</li>
+    <li>Deterministic attestation + Application 360 with the default batteries; everything in &sect;12 hot-reloadable.</li>
+    <li>Context resolution with four dev personas (single-app, multi-app, no-app, SRE) and the clarification flow.</li>
+    <li>Typed report cards + Markdown export; activity log; OTel end to end; redaction layer; unit + E2E tests per NFR-QE.</li>
+    <li>Live-mode backend interfaces implemented with a working single-cluster happy path (config-guarded), exercised against a real cluster only if one is available.</li>
+  </ol>
+  <h3>Out of scope, phased next</h3>
+  <p>Real OAuth/JWT validation (M3); ITSM/incident ingestion (M4); remediation actions with approvals (M4); additional domains such as AWS/Azure MCPs (M4); Grafana embedded panels (M3); multi-agent A2A federation (M5).</p>
+
+  <h3>Acceptance criteria: the demo script</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th class="num">#</th><th>Criterion</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><code>make setup &amp;&amp; make dev</code> brings up the full stack locally with only Ollama as a prerequisite.</td></tr>
+      <tr><td class="num">2</td><td>As Ada: &ldquo;why is payments-api flaky in prod?&rdquo; yields, in one turn: resolved context in the panel, two cluster attestations (one healthy, one degraded ingress with node maintenance), an 18-section App 360 report with a crashloop finding, and a grounded narrative with a next step, streamed live.</td></tr>
+      <tr><td class="num">3</td><td>As Ravi (6 apps): the agent asks exactly one clarifying question with options.</td></tr>
+      <tr><td class="num">4</td><td>As Nia (no apps): onboarding guidance, no checks executed.</td></tr>
+      <tr><td class="num">5</td><td>Editing <code>system_prompt.md</code> changes agent behavior on the next message, no restart.</td></tr>
+      <tr><td class="num">6</td><td>Removing a check from <code>app360.yaml</code> removes it from the next report, no restart.</td></tr>
+      <tr><td class="num">7</td><td>One Jaeger trace shows the whole turn across all five services with <code>thread.id</code> on every span; grepping logs for a canary secret planted in env yields nothing.</td></tr>
+      <tr><td class="num">8</td><td>All tests, lint, and type checks pass via <code>make check</code>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Phasing</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Phase</th><th>Content</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mono">M0</span> <span class="pill ok">done</span></td><td>Repo, scaffold, config seed, research, this PRD</td></tr>
+      <tr><td><span class="mono">M1</span></td><td>Full mock-mode MVP per acceptance criteria</td></tr>
+      <tr><td><span class="mono">M2</span></td><td>Hardening: tests to target, telemetry polish, docs, demo script</td></tr>
+      <tr><td><span class="mono">M3</span></td><td>Live backends (kubeconfig/Thanos), JWT validation, Grafana links</td></tr>
+      <tr><td><span class="mono">M4</span></td><td>New domains, ITSM ingestion, guarded remediation actions</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================================ 16 ================================ -->
+<section class="doc" id="s16">
+  <h2><span class="secnum">16</span>Risks and mitigations</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Small local models mis-handle tool loops</td><td>Wrong or stalled analysis</td><td>Deterministic phases carry the triage core; LLM narrates; <span class="mono">ollama_chat</span> provider; qwen3:4b &rarr; gpt-oss:20b escalation; loop budget</td></tr>
+      <tr><td>Fresh dependency majors (MCP SDK, A2A 1.0)</td><td>API drift, bugs</td><td>Versions pinned; wire formats verified against source during research; compat notes recorded in repo</td></tr>
+      <tr><td>Mock fidelity diverges from live clusters</td><td>False confidence</td><td>Identical tool contracts, live interfaces built in MVP, one real-cluster smoke in M3</td></tr>
+      <tr><td>Check sprawl / noisy reports</td><td>Alert fatigue in report form</td><td>Severity discipline, mixin-derived false-positive guards, per-check runbook links, config review</td></tr>
+      <tr><td>Secrets leakage via logs or LLM narrative</td><td>Security incident</td><td>Central redaction, metadata-only Secret tools, canary test in CI, NFR-LOG rules</td></tr>
+      <tr><td>Hot reload of invalid config</td><td>Outage of the judgment layer</td><td>Validate-then-swap with last-known-good (FR-CFG-3)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================================ 17 ================================ -->
+<section class="doc" id="s17">
+  <h2><span class="secnum">17</span>Open questions for review</h2>
+  <ol class="oq">
+    <li>Console framework: proceed with React + Vite, or align with the Angular 20 + Material stack from the SSOP prototype? (D7; React assumed.)</li>
+    <li>Default model <code>qwen3:4b</code> with <code>gpt-oss:20b</code> as the documented escalation: acceptable default?</li>
+    <li>Decision D1 (attestation enforced in the agent runtime, config-driven; gateway stays policy-only): approved?</li>
+    <li>Fleet registry as <code>fleet.yaml</code> for MVP, with an OCM/ACM inventory adapter later: acceptable?</li>
+    <li>Identity claims: which claims will the real IdP JWT carry, and is group-to-application mapping owned by the application registry (as assumed) or by LDAP group conventions?</li>
+    <li>Should the MVP report include an incident-reference field (INC id free text) to echo the incident-console idiom, or defer all ITSM concepts to M4?</li>
+    <li>Any check in &sect;10 you want added, removed, or re-weighted before the defaults are frozen?</li>
+  </ol>
+</section>
+
+<!-- ================================ 18 ================================ -->
+<section class="doc" id="s18">
+  <h2><span class="secnum">18</span>References</h2>
+  <ul>
+    <li>Red Hat: ClusterVersion condition types; performing and troubleshooting cluster updates; ClusterOperator conditions dev guide (openshift/enhancements).</li>
+    <li>Red Hat KCS: MachineConfigPool degraded/paused solutions (5317441, 5244121, 5598401); CSR troubleshooting (5044281, 3716861); managed-OpenShift maintenance windows (6648291).</li>
+    <li>kubernetes-mixin (monitoring.mixins.dev): KubeNodeNotReady, KubePodCrashLooping, KubePodNotReady, KubeDeploymentReplicasMismatch, KubeHpaMaxedOut, KubeQuotaAlmostFull, CPUThrottlingHigh, KubePersistentVolumeFillingUp, KubeCPUOvercommit, KubeClientCertificateExpiration.</li>
+    <li>openshift/runbooks: etcdNoLeader, etcdHighFsyncDurations, etcdInsufficientMembers, KubeAPIErrorBudgetBurn; kube-prometheus Watchdog runbook.</li>
+    <li>kube-state-metrics docs: pod and namespace metrics; v2 <span class="mono">label_*</span> allowlist behavior.</li>
+    <li>Red Hat ACM Observability (Thanos-based fleet metrics; <span class="mono">cluster</span>/<span class="mono">clusterID</span> labels); Red Hat Insights Advisor.</li>
+    <li>Google SRE book: Monitoring golden signals; Effective Troubleshooting; Emergency Response. Brendan Gregg: the USE method.</li>
+    <li>Google ADK 2.7.1 (adk.dev): LLM agents, custom agents, MCP tools, A2A exposing, observability. A2A 1.0 specification (a2a-protocol.org). MCP Python SDK (modelcontextprotocol Python SDK docs).</li>
+  </ul>
+  <footer class="colophon">
+    <p>Canonical text mirror lives in the repo at <span class="mono">docs/PRD.md</span>; this page is the review artifact. Draft v0.1, 2026-08-25. Feedback: comment on this artifact or edit the open-questions list.</p>
+  </footer>
+</section>
+
+</main>
+</div>
