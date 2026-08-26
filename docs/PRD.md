@@ -4,7 +4,7 @@
 |---|---|
 | Status | Draft v0.1, for review |
 | Date | 2026-08-25 |
-| Authors | Aadesh (product owner), Claude (drafting) |
+| Authors | Platform engineering (product owner); drafted with Claude |
 | Repo | `Cloud Operations Agent Standalone` |
 | Decision needed | Approve scope, architecture, and Decision D1 before the build phase begins |
 
@@ -64,16 +64,16 @@ Section 10 carries the full catalog with sources.
 
 | Persona | Description | Primary need |
 |---|---|---|
-| App developer (Ada) | Owns 1-2 applications, limited platform knowledge | "My app is flaky in prod. Is it me or the platform? What do I tell my lead?" |
-| SRE / platform engineer (Ravi) | Supports many applications and clusters | Fast, evidence-dense state assessment; skip the basics; compare across clusters |
-| New team member (Nia) | No registered applications yet | Guided onboarding: agent explains what it needs and how to get registered |
+| App developer | Owns 1-2 applications, limited platform knowledge | "My app is flaky in prod. Is it me or the platform? What do I tell my lead?" |
+| SRE / platform engineer | Supports many applications and clusters | Fast, evidence-dense state assessment; skip the basics; compare across clusters |
+| New team member | No registered applications yet | Guided onboarding: agent explains what it needs and how to get registered |
 | Ops manager | Consumes reports | Standard-format Application 360 reports for review meetings |
 
 Representative stories:
 
-- As Ada, I ask "why is payments-api slow in prod" and receive, without further prompting: a health verdict for each prod cluster running payments-api, an Application 360 report, and a concrete next step.
-- As Ravi, I ask about a cluster directly ("attest prod-east-2") and get the attestation card plus what changed recently.
-- As Ada, when my app runs in two environments, the agent asks me one clarifying question with the options listed, not a wall of questions.
+- As an app developer, I ask "why is payments-api slow in prod" and receive, without further prompting: a health verdict for each prod cluster running payments-api, an Application 360 report, and a concrete next step.
+- As an SRE, I ask about a cluster directly ("attest prod-east-2") and get the attestation card plus what changed recently.
+- As an app developer whose application runs in two environments, I get one clarifying question with the options listed, not a wall of questions.
 - As an operator, I add a new check to the App 360 battery by editing a YAML file, and the very next report includes it, with no restart.
 
 ## 5. System architecture
@@ -127,7 +127,7 @@ flowchart LR
 | Component | Owns | Explicitly does not own |
 |---|---|---|
 | Ops Console (React SPA) | Chat UX, report cards, context panel, activity log, dev identity picker | Business logic, direct MCP/agent access |
-| Console BFF (Express) | Single origin for the SPA, A2A client, SSE normalization, identity claim injection, OTel for the web tier | Triage logic, tool execution |
+| Console BFF (Express) | Backend-for-frontend: the console's own thin server and the SPA's single origin. A2A client, SSE normalization, identity claim injection, OTel for the web tier | Triage logic, tool execution |
 | Agent service (ADK) | Conversation state, deterministic triage phases, check engine, LLM analysis loop, A2A surface | Tool implementations, cluster credentials |
 | MCP Gateway | Server registry, tool namespacing (`ocp__*`, `obs__*`), allow/deny policy, per-call audit + telemetry, catalog refresh | Domain logic, check semantics, conversation state |
 | OpenShift MCP | Fleet registry + cluster resolution, cluster/app state tools (mock and live backends) | Metric math, report logic |
@@ -353,7 +353,7 @@ Model, temperature, and loop budget live in `models.yaml`, hot-reloaded.
 ```mermaid
 sequenceDiagram
   autonumber
-  actor U as User (Ada)
+  actor U as App developer
   participant C as Console SPA
   participant B as BFF (Express)
   participant A as Agent (ADK / A2A)
@@ -394,7 +394,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   autonumber
-  actor U as User (Ravi, 6 apps)
+  actor U as SRE (6 apps)
   participant A as Agent
   U->>A: "Is my stuff healthy?"
   A->>A: Context resolution: 6 candidate apps
@@ -535,7 +535,7 @@ Span model for one turn (names illustrative):
 
 ```
 console.turn (SPA)
-  bff.chat_stream                      thread.id=ctx-42 user.sub=ada
+  bff.chat_stream                      thread.id=ctx-42 user.sub=app-developer
     a2a.send_streaming_message
       agent.orchestrate
         agent.phase.context_resolution
@@ -583,9 +583,9 @@ No Wells Fargo marks, names, or proprietary assets are used.
 ### Acceptance criteria (demo script)
 
 1. `make setup && make dev` brings up the full stack locally with only Ollama as a prerequisite.
-2. As Ada: "why is payments-api flaky in prod?" yields, in one turn: resolved context in the panel, two cluster attestations (one healthy, one degraded ingress with node maintenance), an 18-section App 360 report with a crashloop finding, and a grounded narrative with a next step, streamed live.
-3. As Ravi (6 apps): the agent asks exactly one clarifying question with options.
-4. As Nia (no apps): onboarding guidance, no checks executed.
+2. As the app-developer persona: "why is payments-api flaky in prod?" yields, in one turn: resolved context in the panel, two cluster attestations (one healthy, one degraded ingress with node maintenance), an 18-section App 360 report with a crashloop finding, and a grounded narrative with a next step, streamed live.
+3. As the SRE persona (6 apps): the agent asks exactly one clarifying question with options.
+4. As the new-joiner persona (no apps): onboarding guidance, no checks executed.
 5. Editing `system_prompt.md` changes agent behavior on the next message, no restart.
 6. Removing a check from `app360.yaml` removes it from the next report, no restart.
 7. One Jaeger trace shows the whole turn across all five services with `thread.id` on every span; grepping logs for a canary secret planted in env yields nothing.
