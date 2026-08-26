@@ -38,7 +38,18 @@ def _instruction_provider(config_dir: Path):
     def provider(ctx: ReadonlyContext) -> str:
         grounding = str(ctx.state.get("grounding_text", ""))
         task_hint = str(ctx.state.get("task_hint", ""))
-        return assemble_instruction(config_dir, grounding, task_hint)
+        conversation = str(ctx.state.get("conversation_text", ""))
+        instruction = assemble_instruction(config_dir, grounding, task_hint, conversation)
+        # Reasoning models spend tens of seconds thinking before the first
+        # visible token, and over the OpenAI-compat surface the think-tokens
+        # can leak into content. Qwen3 honors the /no_think soft switch;
+        # config/models.yaml (hot-read) can turn this off for evaluation.
+        from cloudops.common.config import load_yaml
+
+        inference = load_yaml(config_dir / "models.yaml").get("inference", {})
+        if inference.get("disable_thinking", True) and str(inference.get("model", "")).startswith("qwen3"):
+            instruction += "\n\n/no_think"
+        return instruction
 
     return provider
 
@@ -81,4 +92,10 @@ def build_analyst() -> LlmAgent:
         instruction=_instruction_provider(settings.config_dir),
         tools=[toolset],
         before_tool_callback=_tool_budget_callback,
+        # The session history carries the full report fences (tens of KB of
+        # JSON) which would bloat a small local model's prompt and slow
+        # prefill badly. The orchestrator instead curates the model's view:
+        # a fence-stripped transcript plus compact grounding, injected via
+        # the instruction provider.
+        include_contents="none",
     )

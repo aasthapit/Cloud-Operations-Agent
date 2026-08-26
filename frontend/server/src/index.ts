@@ -1,0 +1,179 @@
+/**
+ * The console BFF (backend-for-frontend): the SPA's single origin.
+ *
+ * Responsibilities (PRD 5.1): serve the SPA, expose the dev identity list,
+ * relay chat turns to the agent over A2A with identity claims stamped into
+ * request metadata (FR-ID-1/2), and normalize the A2A stream + cloudops
+ * fences into simple typed SSE events for the browser. No triage logic
+ * lives here (FR-UI-6 stays honest because the browser only ever sees this
+ * API).
+ */
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+
+import express from "express";
+import YAML from "yaml";
+
+import { sendStreamingMessage, type A2AClaims } from "./a2a.js";
+import { config } from "./config.js";
+import { logger } from "./logger.js";
+import { FenceParser } from "./normalize.js";
+import { setupTelemetry, tracer } from "./telemetry.js";
+
+setupTelemetry();
+const app = express();
+app.use(express.json({ limit: "256kb" }));
+
+/** Dev personas, read fresh per request so users.yaml hot-reloads (F9). */
+function loadUsers(): A2AClaims[] {
+  const file = path.join(config.configDir, "identity", "users.yaml");
+  const doc = YAML.parse(fs.readFileSync(file, "utf8")) as { users?: A2AClaims[] };
+  return doc.users ?? [];
+}
+
+/** Config-version chip: same file set the agent hashes (user flow F9). */
+function configVersion(): string {
+  const files = [
+    "checks/health_attestation.yaml",
+    "checks/app360.yaml",
+    "agent/system_prompt.md",
+    "agent/routing.md",
+    "agent/agent.yaml",
+    "models.yaml",
+  ].sort();
+  const h = createHash("sha1");
+  for (const f of files) {
+    try {
+      h.update(fs.readFileSync(path.join(config.configDir, f)));
+    } catch {
+      h.update(`missing:${f}`);
+    }
+  }
+  return h.digest("hex").slice(0, 7);
+}
+
+app.get("/healthz", (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.get("/api/users", (_req, res) => {
+  if (!config.isDev()) {
+    // The picker is a dev affordance only (FR-UI-4); prod uses JWT claims.
+    res.json({ users: [] });
+    return;
+  }
+  try {
+    res.json({ users: loadUsers() });
+  } catch (err) {
+    logger.error({ err }, "users.load_failed");
+    res.status(500).json({ error: "could not load identity personas" });
+  }
+});
+
+app.get("/api/meta", (_req, res) => {
+  res.json({
+    mode: config.backendMode,
+    env: config.env,
+    configVersion: configVersion(),
+  });
+});
+
+/**
+ * One chat turn: POST {message, userSub, contextId?} -> SSE of UI events.
+ * Event types: meta | phase | context | clarify | attestation | app360 |
+ * error | text | state | done (see web/src/types.ts).
+ */
+app.post("/api/chat/stream", async (req, res) => {
+  const { message, userSub, contextId } = req.body as {
+    message?: string;
+    userSub?: string;
+    contextId?: string;
+  };
+  if (!message || typeof message !== "string") {
+    res.status(400).json({ error: "message is required" });
+    return;
+  }
+
+  // Dev identity: resolve the picker's selection to full claims here, the
+  // exact seam where production swaps in JWT validation (FR-ID-3).
+  let claims: A2AClaims = { sub: "", name: "", email: "", groups: [] };
+  try {
+    const found = loadUsers().find((u) => u.sub === userSub);
+    if (found) claims = found;
+  } catch (err) {
+    logger.warn({ err }, "users.load_failed_for_turn");
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+  const send = (event: Record<string, unknown>) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  const span = tracer().startSpan("bff.chat_stream", {
+    attributes: { "thread.id": contextId ?? "new", "user.sub": claims.sub || "-" },
+  });
+  const parser = new FenceParser();
+  let announcedContext = false;
+  const started = Date.now();
+  try {
+    for await (const event of sendStreamingMessage(config.agentUrl, message, claims, contextId)) {
+      if (!announcedContext && event.contextId) {
+        announcedContext = true;
+        send({ type: "meta", contextId: event.contextId });
+      }
+      // artifactUpdate re-aggregates text already streamed through working
+      // statusUpdates (verified against the ADK A2A executor's stream);
+      // forwarding it would duplicate the narrative.
+      if (event.kind === "artifactUpdate") continue;
+      for (const text of event.texts) {
+        for (const ui of parser.push(text)) {
+          if (ui.type === "text") send({ type: "text", delta: ui.delta });
+          else send({ type: ui.kind, payload: ui.payload });
+        }
+      }
+      if (event.kind === "statusUpdate" && event.state && event.state !== "TASK_STATE_WORKING") {
+        send({ type: "state", state: event.state });
+      }
+    }
+    for (const ui of parser.flush()) {
+      if (ui.type === "text") send({ type: "text", delta: ui.delta });
+    }
+    logger.info(
+      { thread: contextId, user: claims.sub, duration_ms: Date.now() - started },
+      "chat.turn_complete",
+    );
+  } catch (err) {
+    // Correlation id, never a stack trace, to the client (NFR-LOG-2).
+    const correlationId = span.spanContext().traceId;
+    logger.error({ err, correlationId }, "chat.turn_failed");
+    send({
+      type: "error",
+      payload: {
+        correlation_id: correlationId,
+        message: "The agent could not complete this turn. The correlation id maps to the full trace.",
+      },
+    });
+  } finally {
+    span.end();
+    send({ type: "done" });
+    res.end();
+  }
+});
+
+// Production: serve the built SPA from web/dist (single origin).
+const webDist = path.resolve(import.meta.dirname, "../../web/dist");
+if (fs.existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get(/^\/(?!api\/).*/, (_req, res) => {
+    res.sendFile(path.join(webDist, "index.html"));
+  });
+}
+
+app.listen(config.port, "127.0.0.1", () => {
+  logger.info({ port: config.port, mode: config.backendMode }, "bff.serving");
+});

@@ -267,22 +267,26 @@ class TriageOrchestrator(BaseAgent):
         if context.scope == "cluster":
             task = (
                 "The user asked for a direct cluster attestation. Summarize the verdict "
-                "in 2-3 sentences, then use tools to report what changed recently on this "
-                "cluster (operator conditions, update history, machine config pool "
-                "settle times, notable events)."
+                "in 2-3 sentences, then use ONE OR TWO tool calls at most to report what "
+                "changed recently on this cluster (cluster version history, machine "
+                "config pool state, recent events), then answer."
             )
         elif first_report_this_turn:
             task = (
-                "First resolution in this thread. Narrate: (1) per-cluster attestation in "
-                "at most three sentences each, (2) the Application 360 narrative fields "
-                "(executive summary, findings for failing/warning sections, numbered "
-                "recommendations, final assessment reason), (3) a direct answer to the "
-                "user's question with the single most useful next step. Be explicit about "
-                "platform-attributable vs application-attributable causes."
+                "First resolution in this thread. The deterministic phases already "
+                "gathered ALL the evidence you need; it is in GROUNDING DATA below. "
+                "Do NOT call any tools this turn. Write, in order: (1) per-cluster "
+                "attestation summary, at most three sentences each; (2) the Application "
+                "360 narrative fields (executive summary, findings for failing/warning "
+                "sections, numbered recommendations, final assessment reason); (3) a "
+                "direct answer to the user's question with the single most useful next "
+                "step. Be explicit about platform-attributable vs application-"
+                "attributable causes."
             )
         else:
             task = (
-                "Follow-up turn. Answer the user's question using tools as needed. "
+                "Follow-up turn. Answer the user's question; call a tool only when the "
+                "grounding data cannot answer it. "
                 + ("Attestation changed since last check: " + "; ".join(changes) + ". Lead with that. "
                    if changes else "")
                 + "Ground every claim in tool results or the grounding data."
@@ -291,11 +295,43 @@ class TriageOrchestrator(BaseAgent):
         yield self._event(
             self._phase("narrative", "start"),
             {"grounding_text": json.dumps(grounding, ensure_ascii=False),
-             "task_hint": task},
+             "task_hint": task,
+             "conversation_text": _transcript(ctx, user_text)},
         )
         with tracer.start_as_current_span("agent.phase.narrative"):
             async for event in self.analyst.run_async(ctx):
                 yield event
+
+
+def _transcript(ctx: InvocationContext, current_user_text: str) -> str:
+    """A fence-stripped, size-bounded transcript for the analyst's prompt.
+
+    The analyst runs with include_contents='none' (the raw history carries
+    tens of KB of report JSON that would wreck a small local model's prefill
+    time), so this curated view is its only conversational memory: user
+    turns and the analyst's own final texts, most recent last.
+    """
+    from cloudops.agent.protocol import extract_fences
+
+    lines: list[str] = []
+    for event in getattr(ctx.session, "events", []) or []:
+        content = getattr(event, "content", None)
+        if content is None or not getattr(content, "parts", None):
+            continue
+        text = " ".join(
+            p.text for p in content.parts if isinstance(getattr(p, "text", None), str)
+        ).strip()
+        if not text:
+            continue
+        author = getattr(event, "author", "")
+        if author == "user":
+            lines.append(f"User: {text[:600]}")
+        elif author == "analyst" and not getattr(event, "partial", False):
+            stripped, _ = extract_fences(text)
+            if stripped:
+                lines.append(f"You: {stripped[:800]}")
+    lines.append(f"User: {current_user_text[:600]}")
+    return "\n".join(lines[-12:])
 
 
 def _compact_app360(report: Any) -> dict[str, Any]:

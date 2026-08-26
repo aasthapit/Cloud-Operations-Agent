@@ -1,0 +1,134 @@
+/**
+ * The AI Assistant column: streamed markdown turns, phase ticks, inline
+ * report cards, clarification quick-picks (FR-UI-5), and the input row.
+ */
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+import type { ChatItem } from "../state";
+import { ReportCard } from "./ReportCard";
+
+function PhaseLine(props: { payload: Record<string, unknown> }) {
+  const { phase, status } = props.payload as { phase: string; status: string };
+  const detail =
+    phase === "attestation" && status === "start"
+      ? ` - ${((props.payload.clusters as string[]) ?? []).join(", ")}`
+      : phase === "attestation" && status === "done"
+        ? ` - ${Object.entries((props.payload.verdicts as Record<string, string>) ?? {})
+            .map(([c, v]) => `${c}: ${v}`)
+            .join(", ")}`
+        : "";
+  return (
+    <div className="phase-line">
+      {status === "start" ? <span className="spin">⟳</span> : <span className="tick">✓</span>}
+      {phase} {status}
+      {detail}
+    </div>
+  );
+}
+
+export function Chat(props: {
+  items: ChatItem[];
+  busy: boolean;
+  onSend: (text: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+  }, [props.items]);
+
+  const send = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || props.busy) return;
+    setDraft("");
+    props.onSend(trimmed);
+  };
+
+  return (
+    <div className="chatcol">
+      <div className="card">
+        <div className="hd">
+          AI Assistant
+          <span className={`pill ${props.busy ? "streaming" : "idle"}`}>
+            {props.busy ? "streaming" : "idle"}
+          </span>
+        </div>
+        <div className="turns" ref={scroller}>
+          {props.items.length === 0 && (
+            <div className="bubble agent">
+              <div className="who">Agent</div>
+              Ask about an application or a cluster; I attest platform health before every answer.
+              Try: <em>Why is payments-api flaky in prod?</em> or <em>attest prod-east-2</em>.
+            </div>
+          )}
+          {props.items.map((item, i) => {
+            switch (item.kind) {
+              case "user":
+                return (
+                  <div className="bubble user" key={i}>
+                    <div className="who">You</div>
+                    {item.text}
+                  </div>
+                );
+              case "agent":
+                return (
+                  <div className="bubble agent" key={i}>
+                    <div className="who">Agent</div>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
+                  </div>
+                );
+              case "phase":
+                return <PhaseLine payload={item.payload} key={i} />;
+              case "app360":
+                return <ReportCard report={item.report} key={i} />;
+              case "clarify":
+                return (
+                  <div className="bubble agent" key={i}>
+                    <div className="who">Agent</div>
+                    {item.payload.question}
+                    <div className="quick">
+                      {item.payload.options.map((option) => (
+                        <button key={option} onClick={() => send(option)} disabled={props.busy}>
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              case "error":
+                return (
+                  <div className="bubble agent" key={i}>
+                    <div className="who">Agent</div>
+                    <span className="pill error">error</span> {item.payload.message}{" "}
+                    <span className="mono">correlation {item.payload.correlation_id}</span>
+                  </div>
+                );
+              default:
+                return null;
+            }
+          })}
+        </div>
+        <form
+          className="inrow"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(draft);
+          }}
+        >
+          <input
+            value={draft}
+            placeholder="Ask a question…"
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={props.busy}
+          />
+          <button type="submit" disabled={props.busy || !draft.trim()}>
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

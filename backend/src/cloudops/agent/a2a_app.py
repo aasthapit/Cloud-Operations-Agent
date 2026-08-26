@@ -34,11 +34,25 @@ def build_app() -> Starlette:
     # The default card builder leaves capabilities.streaming unset, and the
     # 1.0 request handler then refuses SendStreamingMessage outright; build
     # the card ourselves with streaming declared (the BFF streams every turn).
-    card = asyncio.run(
-        AgentCardBuilder(
-            agent=orchestrator,
-            rpc_url=f"http://localhost:{settings.cloudops_agent_port}/",
-            capabilities=AgentCapabilities(streaming=True),
-        ).build()
+    #
+    # Card building lists the analyst's MCP tools, which means connecting to
+    # the gateway; under `make dev` all services boot simultaneously, so
+    # retry briefly instead of imposing a boot order.
+    builder = AgentCardBuilder(
+        agent=orchestrator,
+        rpc_url=f"http://localhost:{settings.cloudops_agent_port}/",
+        capabilities=AgentCapabilities(streaming=True),
     )
+
+    async def build_card_with_retry():
+        last_error: Exception | None = None
+        for _attempt in range(15):
+            try:
+                return await builder.build()
+            except Exception as exc:  # noqa: BLE001 - gateway may still be booting
+                last_error = exc
+                await asyncio.sleep(2)
+        raise RuntimeError(f"could not build the agent card (is the gateway up?): {last_error}")
+
+    card = asyncio.run(build_card_with_retry())
     return to_a2a(orchestrator, host="localhost", port=settings.cloudops_agent_port, agent_card=card)

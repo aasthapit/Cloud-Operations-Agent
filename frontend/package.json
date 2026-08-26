@@ -1,0 +1,15 @@
+{
+  "name": "cloudops-frontend",
+  "private": true,
+  "description": "Cloud Operations Agent console: Express BFF + React SPA (npm workspaces)",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web && npm run build -w server",
+    "check": "npm run check -w server && npm run check -w web"
+  }
+}

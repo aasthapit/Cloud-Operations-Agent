@@ -20,9 +20,16 @@ inference:
 
   # Model served by the local Ollama instance. Must support tool calling.
   # Known-good options installed on this machine:
-  #   qwen3:4b     - fast, decent tool use (default)
-  #   gpt-oss:20b  - much stronger tool use and reasoning, heavier
+  #   qwen3:4b     - default: works everywhere; its chain-of-thought prose
+  #                  opens the visible answer (this build ignores /no_think)
+  #                  and a first narrative takes ~30-45s
+  #   gpt-oss:20b  - preferred escalation: strong tool discipline, reasoning
+  #                  kept separate; requires a current blob (`ollama pull
+  #                  gpt-oss:20b`) - year-old blobs fail to load on modern
+  #                  Ollama with a tensor size overflow error
   #   llama3.2:3b  - fastest, weakest tool use
+  # NOTE: inference.* binds when the agent process starts; agent.* below is
+  # hot-read every turn.
   model: qwen3:4b
 
   # Ollama base URL comes from the OLLAMA_API_BASE environment variable so
@@ -31,6 +38,11 @@ inference:
   # Sampling. Keep temperature low: triage should be boring and repeatable.
   temperature: 0.2
   max_output_tokens: 4096
+
+  # Reasoning models (qwen3) think for tens of seconds before the first
+  # visible token; triage narration does not need it because the evidence
+  # is already gathered deterministically. Hot-read per invocation.
+  disable_thinking: true
 
 agent:
   # Safety valve for the LLM tool loop in the analysis phase. The

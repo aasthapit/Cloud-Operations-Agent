@@ -25,7 +25,9 @@ a tool result from this conversation.
 """
 
 
-def assemble_instruction(config_dir: Path, grounding_text: str, task_hint: str) -> str:
+def assemble_instruction(
+    config_dir: Path, grounding_text: str, task_hint: str, conversation_text: str = ""
+) -> str:
     """Compose the full system instruction for one invocation."""
     agent_cfg = load_yaml(config_dir / "agent" / "agent.yaml")
     agent_dir = config_dir / "agent"
@@ -41,6 +43,8 @@ def assemble_instruction(config_dir: Path, grounding_text: str, task_hint: str) 
                 parts.append(read_prompt(skill_path))
 
     parts.append(_PROTOCOL_NOTE)
+    if conversation_text:
+        parts.append(f"# Conversation so far\n\n{conversation_text}")
     if task_hint:
         parts.append(f"# This turn\n\n{task_hint}")
     if grounding_text:
