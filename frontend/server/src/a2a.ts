@@ -35,7 +35,16 @@ export interface A2AStreamEvent {
 function normalizeResult(result: Record<string, unknown>): A2AStreamEvent | null {
   const partTexts = (parts: unknown): string[] =>
     Array.isArray(parts)
-      ? parts.map((p) => (p && typeof p === "object" ? String((p as { text?: string }).text ?? "") : "")).filter(Boolean)
+      ? parts
+          .map((p) => {
+            if (!p || typeof p !== "object") return "";
+            const part = p as { text?: string; metadata?: Record<string, unknown> };
+            // Reasoning-model thought parts are marked by ADK's converter;
+            // they are internal deliberation, never user-facing narrative.
+            if (part.metadata?.adk_thought) return "";
+            return String(part.text ?? "");
+          })
+          .filter(Boolean)
       : [];
 
   if (result.task && typeof result.task === "object") {

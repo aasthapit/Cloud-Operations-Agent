@@ -20,17 +20,16 @@ inference:
 
   # Model served by the local Ollama instance. Must support tool calling.
   # Known-good options installed on this machine:
-  #   qwen3:4b     - default: works everywhere; its chain-of-thought prose
-  #                  opens the visible answer (this build ignores /no_think)
-  #                  and a first narrative takes ~30-45s
-  #   gpt-oss:20b  - preferred escalation: strong tool discipline, reasoning
-  #                  kept separate; requires a current blob (`ollama pull
-  #                  gpt-oss:20b`) - year-old blobs fail to load on modern
-  #                  Ollama with a tensor size overflow error
+  #   gpt-oss:20b  - default: strong tool discipline, reasoning kept out of
+  #                  the visible answer. Needs a current blob (`ollama pull
+  #                  gpt-oss:20b`); year-old blobs fail to load on modern
+  #                  Ollama with a tensor size overflow error.
+  #   qwen3:4b     - lighter fallback; its chain-of-thought prose opens the
+  #                  visible answer (this build ignores /no_think)
   #   llama3.2:3b  - fastest, weakest tool use
   # NOTE: inference.* binds when the agent process starts; agent.* below is
   # hot-read every turn.
-  model: qwen3:4b
+  model: gpt-oss:20b
 
   # Ollama base URL comes from the OLLAMA_API_BASE environment variable so
   # deployments can point at a remote inference host without editing config.

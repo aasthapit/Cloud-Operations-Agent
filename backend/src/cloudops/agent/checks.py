@@ -220,7 +220,15 @@ def derive_verdict(checks: list[CheckResult]) -> tuple[ClusterVerdict, list[str]
     errors = [c for c in checks if c.status == CheckStatus.ERROR]
 
     for c in unattestable + critical_fails + maintenance + warns:
-        signals.append(f"{c.id}: {c.reason}" if c.reason else c.id)
+        signal = f"{c.id}: {c.reason}" if c.reason else c.id
+        # Append what the triggered rule actually saw, so downstream
+        # narration names the failing object (e.g. the degraded operator)
+        # instead of paraphrasing the generic rule reason.
+        rules = c.evidence.triggered_rules
+        if rules and rules[0].get("observed") not in (None, "", [], {}):
+            observed = json.dumps(rules[0]["observed"], ensure_ascii=False)
+            signal += f" [observed: {observed[:120]}]"
+        signals.append(signal)
     for c in errors:
         signals.append(f"{c.id}: check errored ({(c.evidence.error or '')[:80]})")
 

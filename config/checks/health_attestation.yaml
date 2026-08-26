@@ -90,7 +90,7 @@ checks:
       - path: critical_degraded
         op: not_empty
         outcome: fail
-        reason: a critical cluster operator (etcd, kube-apiserver, ingress, dns, authentication, monitoring, ...) is Degraded
+        reason: a critical-tier cluster operator is Degraded (the evidence names it)
       - path: degraded
         op: not_empty
         outcome: warn
