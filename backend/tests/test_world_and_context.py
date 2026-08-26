@@ -159,3 +159,36 @@ class TestContextResolution:
     async def test_unauthenticated_runs_nothing(self, world, registry):
         outcome, _ = await self._resolve(world, registry, Claims(), "help")
         assert isinstance(outcome, Onboarding)
+
+    @pytest.mark.asyncio
+    async def test_attest_with_trailing_punctuation(self, world, registry):
+        """Regression: 'attest prod-east-2.' captured the dot, fuzzy-matched
+        several clusters, and asked to clarify instead of resolving."""
+        claims = Claims(sub="app-developer", groups=["payments-eng"])
+        outcome, pending = await self._resolve(world, registry, claims, "attest prod-east-2.")
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.clusters == ["prod-east-2"]
+        assert pending is None
+
+    def test_pick_option_exact_beats_substring(self):
+        """Regression: 'prod-east-1' is a substring of 'nonprod-east-1', so
+        substring-only matching looped the clarification forever."""
+        options = ["nonprod-east-1", "prod-east-1", "prod-east-2"]
+        assert ctx_resolution._pick_option("prod-east-1", options) == "prod-east-1"
+        assert ctx_resolution._pick_option("nonprod-east-1", options) == "nonprod-east-1"
+        assert ctx_resolution._pick_option("prod-east-1.", options) == "prod-east-1"
+        assert ctx_resolution._pick_option("2", options) == "prod-east-1"
+        assert ctx_resolution._pick_option("east", options) is None
+
+    @pytest.mark.asyncio
+    async def test_cluster_clarify_reply_resolves_bare_name(self, world, registry):
+        """A cluster-clarify reply naming any real cluster resolves, even if
+        the name was not in the (possibly truncated) options list."""
+        claims = Claims(sub="platform-sre", groups=["retail-sre"])
+        pending = {"kind": "cluster", "options": ["prod-east-1", "prod-east-2"]}
+        outcome, _ = await self._resolve(
+            world, registry, claims, "nonprod-east-1", pending=pending
+        )
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.scope == "cluster"
+        assert outcome.context.clusters == ["nonprod-east-1"]

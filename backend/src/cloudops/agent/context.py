@@ -97,12 +97,32 @@ def _env_hint(text: str) -> str | None:
 
 def _pick_option(text: str, options: list[str]) -> str | None:
     """Interpret a clarification reply: a number, an exact option, or a
-    unique substring match."""
-    stripped = text.strip().lower()
+    unique substring match.
+
+    Exact equality MUST win before substring matching: 'prod-east-1' is a
+    substring of 'nonprod-east-1', so substring-only matching declares a
+    perfectly precise reply ambiguous and loops the clarification forever.
+    """
+    stripped = text.strip().strip(".,;:!?").lower()
     m = re.match(r"^(\d+)\b", stripped)
     if m and 1 <= int(m.group(1)) <= len(options):
         return options[int(m.group(1)) - 1]
-    matches = [o for o in options if o.lower() in stripped or stripped in o.lower()]
+    exact = [o for o in options if o.lower() == stripped]
+    if exact:
+        return exact[0]
+    # An option spoken inside a longer reply ("checkout, prod") counts, but
+    # only on name boundaries: 'prod-east-1' must not match inside
+    # 'nonprod-east-1', so hyphens and dots are name characters, not breaks.
+    contained = [
+        o for o in options
+        if re.search(rf"(?<![a-z0-9._-]){re.escape(o.lower())}(?![a-z0-9._-])", stripped)
+    ]
+    if len(contained) == 1:
+        return contained[0]
+    prefix = [o for o in options if o.lower().startswith(stripped)]
+    if len(prefix) == 1:
+        return prefix[0]
+    matches = [o for o in options if stripped in o.lower()]
     return matches[0] if len(matches) == 1 else None
 
 
@@ -130,7 +150,11 @@ async def resolve(
     # -- explicit cluster scope: "attest <cluster>" (F6, FR-CTX-7) ----------
     m = _ATTEST_RE.search(user_text)
     if m:
-        lookup = await client.call("ocp__resolve_cluster", {"query": m.group(1)})
+        # The character class admits '.', so sentence-final punctuation rides
+        # along ("attest prod-east-2." captured 'prod-east-2.') and turns an
+        # exact name into a fuzzy multi-match. Strip it before resolving.
+        query = m.group(1).strip(".,;:!?")
+        lookup = await client.call("ocp__resolve_cluster", {"query": query})
         matches = lookup.get("matches", [])
         if len(matches) == 1:
             name = matches[0]["name"]
@@ -142,10 +166,10 @@ async def resolve(
         if len(matches) > 1:
             options = [c["name"] for c in matches][:8]
             return Clarify(
-                f"Several clusters match '{m.group(1)}'. Which one?", options, "cluster"
+                f"Several clusters match '{query}'. Which one?", options, "cluster"
             ), {"kind": "cluster", "options": options}
         return Onboarding(
-            f"No cluster matched '{m.group(1)}'. Try the full name, an alias, or "
+            f"No cluster matched '{query}'. Try the full name, an alias, or "
             "ask me to list clusters for an environment or region."
         ), None
 
@@ -154,6 +178,15 @@ async def resolve(
     chosen_env: str | None = _env_hint(user_text)
     if pending:
         picked = _pick_option(user_text, pending.get("options", []))
+        if picked is None and pending.get("kind") == "cluster":
+            # The reply may name a perfectly valid cluster that was not in
+            # the truncated options list; the fleet resolver is the judge.
+            lookup = await client.call(
+                "ocp__resolve_cluster", {"query": user_text.strip().strip(".,;:!?")}
+            )
+            matches = lookup.get("matches", [])
+            if len(matches) == 1:
+                picked = matches[0]["name"]
         if picked is None:
             return Clarify(
                 "I did not catch that; pick one of the options below.",
