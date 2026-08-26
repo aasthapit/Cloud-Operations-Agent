@@ -45,7 +45,7 @@ from starlette.types import Receive, Scope, Send
 from cloudops.common.config import HotConfig
 from cloudops.common.redact import redact_obj
 from cloudops.common.settings import get_settings
-from cloudops.common.telemetry import extract_context
+from cloudops.common.telemetry import extract_context, inject_headers
 from cloudops.gateway.registry import ServerEntry, ServersConfig
 
 log = structlog.get_logger("cloudops.gateway")
@@ -213,9 +213,17 @@ class Gateway:
                 audit("downstream_unavailable")
                 return error(f"Downstream server '{prefix}' is not connected; try again shortly")
             timeout = ds.entry.timeout_seconds
+            # The downstream HTTP session is long-lived (headers pinned at
+            # connect), so per-call trace context rides the MCP request's
+            # _meta instead: traceparent + thread + user, extracted by the
+            # servers' `instrumented` wrapper (NFR-OBS-1..2).
+            call_meta = inject_headers(
+                {"x-thread-id": thread_id, "x-user-sub": _request_user.get()}
+            )
             try:
                 result = await asyncio.wait_for(
-                    ds.session.call_tool(original, arguments), timeout=timeout
+                    ds.session.call_tool(original, arguments, meta=call_meta),
+                    timeout=timeout,
                 )
             except TimeoutError:
                 audit("timeout")

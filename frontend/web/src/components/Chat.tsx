@@ -9,6 +9,21 @@ import remarkGfm from "remark-gfm";
 import type { ChatItem } from "../state";
 import { ReportCard } from "./ReportCard";
 
+/**
+ * Local models pepper their markdown with literal <br> tags, which our
+ * renderer (correctly, NFR-SEC-5: no raw HTML) shows as text. Normalize
+ * them: inside GFM table rows a real newline would split the row, so use
+ * "; " there; elsewhere a paragraph break preserves the intent.
+ */
+function normalizeModelMarkdown(text: string): string {
+  return text
+    .split("\n")
+    .map((line) =>
+      line.replace(/<br\s*\/?>/gi, line.trimStart().startsWith("|") ? "; " : "\n\n"),
+    )
+    .join("\n");
+}
+
 function PhaseLine(props: { payload: Record<string, unknown> }) {
   const { phase, status } = props.payload as { phase: string; status: string };
   const detail =
@@ -77,7 +92,7 @@ export function Chat(props: {
                 return (
                   <div className="bubble agent" key={i}>
                     <div className="who">Agent</div>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeModelMarkdown(item.text)}</ReactMarkdown>
                   </div>
                 );
               case "phase":

@@ -60,8 +60,34 @@ class WorldHolder:
                 log.warning("mockfleet.reload_rejected", error=str(exc))
 
 
+def _caller_context() -> tuple[Any, str]:
+    """Trace context and thread id sent by the gateway in the request's _meta.
+
+    The gateway's downstream HTTP session is long-lived, so per-call context
+    cannot ride HTTP headers; it arrives as extra fields on the MCP request
+    meta instead (traceparent, x-thread-id). Returns (otel_context | None,
+    thread_id) and never raises: a direct (gateway-less) caller simply gets
+    a fresh root span.
+    """
+    try:
+        from mcp.server.lowlevel.server import request_ctx
+
+        meta = request_ctx.get().meta
+        extra = dict(meta.model_extra or {}) if meta is not None else {}
+    except LookupError:
+        extra = {}
+    carrier = {str(k).lower(): str(v) for k, v in extra.items()}
+    ctx = None
+    if "traceparent" in carrier:
+        from cloudops.common.telemetry import extract_context
+
+        ctx = extract_context(carrier)
+    return ctx, carrier.get("x-thread-id", "-")
+
+
 def instrumented(service: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Wrap a tool function with a span + log line. Applied INSIDE @mcp.tool()
+    """Wrap a tool function with a span + log line, parented to the calling
+    turn's trace via request meta (NFR-OBS-1..2). Applied INSIDE @mcp.tool()
     so FastMCP still sees the original signature for schema derivation."""
 
     tracer = trace.get_tracer(service)
@@ -70,16 +96,18 @@ def instrumented(service: str) -> Callable[[Callable[..., Any]], Callable[..., A
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             start = time.perf_counter()
-            with tracer.start_as_current_span(f"mcp.tool {fn.__name__}") as span:
+            parent, thread_id = _caller_context()
+            with tracer.start_as_current_span(f"mcp.tool {fn.__name__}", context=parent) as span:
                 span.set_attribute("mcp.tool", fn.__name__)
+                span.set_attribute("thread.id", thread_id)
                 try:
                     result = fn(*args, **kwargs)
                 except Exception as exc:
                     span.record_exception(exc)
-                    log.warning("tool.error", tool=fn.__name__, error=str(exc))
+                    log.warning("tool.error", tool=fn.__name__, thread_id=thread_id, error=str(exc))
                     raise
                 log.info(
-                    "tool.call", tool=fn.__name__,
+                    "tool.call", tool=fn.__name__, thread_id=thread_id,
                     duration_ms=round((time.perf_counter() - start) * 1000, 1),
                 )
                 return result

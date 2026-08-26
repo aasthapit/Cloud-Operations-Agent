@@ -13,12 +13,11 @@ Design:
   built-in GenAI spans land on our provider (ADK's maybe_set_otel_providers
   is a no-op when a global provider already exists).
 
-Known limitation (documented, accepted for MVP): the gateway-to-domain-MCP
-hop cannot carry per-call traceparent because MCP v1 client sessions pin
-headers at connect time. The gateway span is therefore the leaf of the
-distributed trace; domain-server spans are separate traces joined by tool
-name + timestamp in logs. Revisit when ADK moves to MCP SDK 2.x (per-call
-meta).
+Gateway-to-domain-MCP hop: MCP v1 client sessions pin HTTP headers at
+connect time, so per-call trace context rides the MCP request's _meta
+instead (gateway sends traceparent + x-thread-id + x-user-sub as extra
+meta fields; mcp_servers.shared._caller_context extracts them), keeping
+one distributed trace per turn across all five services (NFR-OBS-1).
 """
 
 from __future__ import annotations
