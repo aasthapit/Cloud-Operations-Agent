@@ -128,6 +128,25 @@ class ClusterAttestation(BaseModel):
     duration_ms: float = 0.0
 
 
+class AttestationChange(BaseModel):
+    """One cluster's verdict delta versus its previous attestation (F5, FR-ATT-7).
+
+    Dumped with by_alias=True it serializes as `from`/`to` (both reserved
+    words in Python, hence the serialization aliases), which is the shape the
+    console renders on the attestation `done` phase tick.
+    """
+
+    cluster: str
+    from_verdict: str = Field(serialization_alias="from")
+    to_verdict: str = Field(serialization_alias="to")
+    note: str = ""  # which signals appeared or cleared
+
+    def summary(self) -> str:
+        """One compact line, for the report's `changes` list and the grounding lead."""
+        line = f"{self.cluster}: {self.from_verdict} -> {self.to_verdict}"
+        return f"{line} ({self.note})" if self.note else line
+
+
 class AttestationReport(BaseModel):
     kind: str = "attestation"
     clusters: list[ClusterAttestation]

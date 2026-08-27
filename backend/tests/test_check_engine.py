@@ -1,21 +1,29 @@
 """Check engine unit tests: rule evaluation, verdict derivation, status maps."""
 
+import pytest
+from conftest import CONFIG_DIR, WorldGateway
+
 from cloudops.agent.checks import (
     _lookup,
     _rule_triggers,
+    attestation_delta,
     derive_verdict,
     evaluate_check,
     report_status,
+    run_attestation,
 )
 from cloudops.agent.models import (
+    AttestationBattery,
     CheckDef,
     CheckEvidence,
     CheckResult,
     CheckStatus,
+    ClusterAttestation,
     ClusterVerdict,
     RuleDef,
     SectionResult,
 )
+from cloudops.common.config import load_yaml
 
 
 def rule(path: str, op: str, value=None, outcome="fail", reason="r") -> RuleDef:
@@ -119,6 +127,82 @@ class TestVerdicts:
             result(CheckStatus.FAIL, "critical"),
         ])
         assert v == ClusterVerdict.UNATTESTABLE
+
+
+def attestation(cluster: str, verdict: ClusterVerdict, failing: list[str]) -> ClusterAttestation:
+    checks = [
+        CheckResult(id=cid, name=cid, severity="critical", status=CheckStatus.FAIL,
+                    evidence=CheckEvidence(tool="t", args={}, timestamp="now"))
+        for cid in failing
+    ] + [
+        CheckResult(id="always-fine", name="X", severity="critical", status=CheckStatus.PASS,
+                    evidence=CheckEvidence(tool="t", args={}, timestamp="now"))
+    ]
+    return ClusterAttestation(cluster=cluster, verdict=verdict, checks=checks)
+
+
+class TestAttestationDelta:
+    """G1 / F5: what changed between two attestations of the same cluster."""
+
+    def test_first_attestation_has_no_delta(self):
+        current = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators"])
+        assert attestation_delta(None, current) is None
+
+    def test_identical_attestation_stays_silent(self):
+        previous = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators"])
+        current = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators"])
+        assert attestation_delta(previous, current) is None
+
+    def test_verdict_flip_names_the_signals_that_cleared(self):
+        previous = attestation("prod-east-2", ClusterVerdict.DEGRADED,
+                               ["cluster-operators", "nodes"])
+        current = attestation("prod-east-2", ClusterVerdict.HEALTHY, [])
+        delta = attestation_delta(previous, current)
+        assert delta is not None
+        assert (delta.from_verdict, delta.to_verdict) == ("degraded", "healthy")
+        assert delta.note == "cleared: cluster-operators, nodes"
+        assert delta.summary().startswith("prod-east-2: degraded -> healthy")
+        # The wire shape the console renders (F5 done tick).
+        assert delta.model_dump(mode="json", by_alias=True) == {
+            "cluster": "prod-east-2", "from": "degraded", "to": "healthy",
+            "note": "cleared: cluster-operators, nodes",
+        }
+
+    def test_new_signal_without_a_verdict_flip_still_reports(self):
+        previous = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators"])
+        current = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators", "etcd"])
+        delta = attestation_delta(previous, current)
+        assert delta is not None
+        assert delta.note == "new: etcd"
+
+
+@pytest.fixture(scope="session")
+def battery() -> AttestationBattery:
+    return AttestationBattery.model_validate(
+        load_yaml(CONFIG_DIR / "checks" / "health_attestation.yaml")
+    )
+
+
+class TestAttestationAgainstTheMockWorld:
+    """G3 / FR-ATT-5: the battery, run for real against the scenario faults."""
+
+    @pytest.mark.asyncio
+    async def test_watchdog_absent_cluster_is_unattestable(self, battery, world):
+        """prod-eu-1 has no Watchdog in config/mock/scenario.yaml: monitoring
+        cannot be trusted, so the verdict is unattestable, never healthy."""
+        [att] = await run_attestation(battery, ["prod-eu-1"], WorldGateway(world), "v1")
+        assert att.verdict is ClusterVerdict.UNATTESTABLE
+        assert any(c.id == "watchdog-present" and c.status == CheckStatus.UNATTESTABLE
+                   for c in att.checks)
+        assert any("watchdog" in s.lower() or "monitoring" in s.lower() for s in att.signals)
+
+    @pytest.mark.asyncio
+    async def test_degraded_and_healthy_clusters_still_separate(self, battery, world):
+        gateway = WorldGateway(world)
+        results = {a.cluster: a for a in
+                   await run_attestation(battery, ["prod-east-2", "prod-east-1"], gateway, "v1")}
+        assert results["prod-east-2"].verdict is ClusterVerdict.DEGRADED
+        assert results["prod-east-1"].verdict is ClusterVerdict.HEALTHY
 
 
 class TestReportStatus:

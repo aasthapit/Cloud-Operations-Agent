@@ -34,6 +34,7 @@ from cloudops.agent.models import (
     App360Report,
     AppInstance,
     AttestationBattery,
+    AttestationChange,
     CheckDef,
     CheckEvidence,
     CheckResult,
@@ -239,6 +240,45 @@ def derive_verdict(checks: list[CheckResult]) -> tuple[ClusterVerdict, list[str]
     if maintenance:
         return ClusterVerdict.MAINTENANCE, signals
     return ClusterVerdict.HEALTHY, signals
+
+
+_SIGNALLING_STATUSES = (
+    CheckStatus.UNATTESTABLE, CheckStatus.FAIL, CheckStatus.MAINTENANCE,
+    CheckStatus.WARN, CheckStatus.ERROR,
+)
+
+
+def signalling_check_ids(attestation: ClusterAttestation) -> set[str]:
+    """Check ids currently contributing a signal (anything but pass/info)."""
+    return {c.id for c in attestation.checks if c.status in _SIGNALLING_STATUSES}
+
+
+def attestation_delta(
+    previous: ClusterAttestation | None, current: ClusterAttestation
+) -> AttestationChange | None:
+    """The F5 delta between a cluster's previous attestation and a fresh one.
+
+    None on the first attestation of a cluster and when neither the verdict
+    nor the set of signalling checks moved: "nothing changed" must stay
+    silent, or every TTL refresh would announce itself (FR-ATT-7).
+    """
+    if previous is None:
+        return None
+    before, after = signalling_check_ids(previous), signalling_check_ids(current)
+    appeared, cleared = sorted(after - before), sorted(before - after)
+    if previous.verdict == current.verdict and not appeared and not cleared:
+        return None
+    notes = []
+    if cleared:
+        notes.append("cleared: " + ", ".join(cleared))
+    if appeared:
+        notes.append("new: " + ", ".join(appeared))
+    return AttestationChange(
+        cluster=current.cluster,
+        from_verdict=previous.verdict.value,
+        to_verdict=current.verdict.value,
+        note="; ".join(notes),
+    )
 
 
 async def run_attestation(
