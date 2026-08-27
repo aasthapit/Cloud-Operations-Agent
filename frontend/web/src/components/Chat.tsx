@@ -24,6 +24,9 @@ function normalizeModelMarkdown(text: string): string {
     .join("\n");
 }
 
+/** Verdict deltas vs the previous attestation, carried on the done tick (F5). */
+type VerdictChange = { cluster: string; from: string; to: string; note?: string };
+
 function PhaseLine(props: { payload: Record<string, unknown> }) {
   const { phase, status } = props.payload as { phase: string; status: string };
   const detail =
@@ -34,11 +37,18 @@ function PhaseLine(props: { payload: Record<string, unknown> }) {
             .map(([c, v]) => `${c}: ${v}`)
             .join(", ")}`
         : "";
+  const changes = (props.payload.changes as VerdictChange[] | undefined) ?? [];
   return (
     <div className="phase-line">
       {status === "start" ? <span className="spin">⟳</span> : <span className="tick">✓</span>}
       {phase} {status}
       {detail}
+      {changes.length > 0 && (
+        <strong title={changes.map((c) => c.note).filter(Boolean).join("; ")}>
+          {" "}
+          changed: {changes.map((c) => `${c.cluster} ${c.from} → ${c.to}`).join(", ")}
+        </strong>
+      )}
     </div>
   );
 }

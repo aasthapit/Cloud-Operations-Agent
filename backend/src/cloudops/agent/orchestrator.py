@@ -15,6 +15,12 @@ prompts) is hot-reloaded configuration (D3). Batteries are re-read every
 turn with last-known-good fallback, so a battery edit lands on the next
 message and a broken edit never takes the agent down (FR-CFG-2/3).
 
+Phases 1 to 4 are deterministic and are what the console renders as cards,
+so phase 5 is the only one allowed to fail softly: when inference is
+unreachable the turn still COMPLETES, carrying the cards plus a notice with
+a correlation id instead of the narrative (F8). Re-attestation additionally
+carries a per-cluster verdict delta, and a change leads the narrative (F5).
+
 Typed payloads (context, reports, clarifications, phase progress) stream as
 cloudops fences (see protocol.py); the analyst never invents them.
 """
@@ -44,8 +50,10 @@ from cloudops.agent.model_factory import agent_tuning
 from cloudops.agent.models import (
     App360Battery,
     AttestationBattery,
+    AttestationChange,
     AttestationReport,
     ClusterAttestation,
+    ClusterVerdict,
     ResolvedContext,
 )
 from cloudops.agent.protocol import fence
@@ -175,10 +183,21 @@ class TriageOrchestrator(BaseAgent):
 
             assert isinstance(outcome, Resolved)
             context = outcome.context
-            yield self._event(
-                fence("context", context.model_dump(mode="json")),
-                {**base_delta, "context": context.model_dump(mode="json"), "pending_clarify": None},
-            )
+            # FR-CTX-7: a mid-thread scope change (different application,
+            # environment, or a switch to cluster scope) must not carry the
+            # previous scope's Application 360 into this turn's grounding.
+            # The attestation cache stays: it is keyed per cluster with its
+            # own TTL, so newly in-scope clusters attest and known ones keep
+            # their history, which is what the F5 delta is computed from.
+            scope_changed = prior is not None and _scope_key(prior) != _scope_key(context)
+            context_delta: dict[str, Any] = {
+                **base_delta,
+                "context": context.model_dump(mode="json"),
+                "pending_clarify": None,
+            }
+            if scope_changed:
+                context_delta |= {"app360_key": None, "app360_compact": []}
+            yield self._event(fence("context", context.model_dump(mode="json")), context_delta)
 
             # --- attestation gate ---------------------------------------
             att_battery: AttestationBattery = self._load(
@@ -196,14 +215,20 @@ class TriageOrchestrator(BaseAgent):
                 or now - float(by_cluster[c].get("epoch", 0)) > ttl
                 or by_cluster[c].get("battery_version") != att_version
             ]
-            changes: list[str] = []
+            changes: list[AttestationChange] = []
             if needed:
                 yield self._event(self._phase("attestation", "start", clusters=needed))
                 fresh = await check_engine.run_attestation(att_battery, needed, gc, att_version)
                 for att in fresh:
-                    previous = by_cluster.get(att.cluster, {}).get("verdict")
-                    if previous and previous != att.verdict.value:
-                        changes.append(f"{att.cluster}: {previous} -> {att.verdict.value}")
+                    # A re-attestation (TTL expiry, battery change, or a scope
+                    # that pulled this cluster back in) is the only place the
+                    # F5 delta can be computed: state still holds the report
+                    # this one replaces.
+                    stored = (by_cluster.get(att.cluster) or {}).get("report")
+                    previous = ClusterAttestation.model_validate(stored) if stored else None
+                    delta = check_engine.attestation_delta(previous, att)
+                    if delta is not None:
+                        changes.append(delta)
                     by_cluster[att.cluster] = {
                         "verdict": att.verdict.value, "epoch": now,
                         "battery_version": att_version,
@@ -214,17 +239,24 @@ class TriageOrchestrator(BaseAgent):
                 ClusterAttestation.model_validate(by_cluster[c]["report"])
                 for c in context.clusters if c in by_cluster
             ]
-            att_report = AttestationReport(clusters=in_scope, changes=changes)
+            att_report = AttestationReport(
+                clusters=in_scope, changes=[c.summary() for c in changes]
+            )
             cache = {"by_cluster": by_cluster}
             yield self._event(
                 fence("attestation", att_report.model_dump(mode="json"))
-                + ("\n" + self._phase("attestation", "done",
-                                      verdicts={a.cluster: a.verdict.value for a in in_scope})),
+                + ("\n" + self._phase(
+                    "attestation", "done",
+                    verdicts={a.cluster: a.verdict.value for a in in_scope},
+                    changes=[c.model_dump(mode="json", by_alias=True) for c in changes],
+                )),
                 {"attestation_cache": cache},
             )
 
             # --- Application 360 ----------------------------------------
-            app360_compact: list[dict[str, Any]] = list(state.get("app360_compact") or [])
+            app360_compact: list[dict[str, Any]] = (
+                [] if scope_changed else list(state.get("app360_compact") or [])
+            )
             first_report_this_turn = False
             if context.scope == "app" and bool(tuning.get("auto_app360", True)):
                 app_battery: App360Battery = self._load(
@@ -232,7 +264,7 @@ class TriageOrchestrator(BaseAgent):
                 )
                 a360_version = config_version([settings.config_dir / "checks" / "app360.yaml"])
                 key = f"{context.application}:{context.environment}:{a360_version}"
-                if state.get("app360_key") != key:
+                if scope_changed or state.get("app360_key") != key:
                     first_report_this_turn = True
                     app360_compact = []
                     yield self._event(self._phase(
@@ -255,15 +287,6 @@ class TriageOrchestrator(BaseAgent):
                     )
 
         # --- ground and hand off to the analyst -------------------------
-        grounding = {
-            "resolved_context": context.model_dump(mode="json"),
-            "attestation": {
-                a.cluster: {"verdict": a.verdict.value, "signals": a.signals[:6]}
-                for a in in_scope
-            },
-            "attestation_changes": changes,
-            "app360": app360_compact,
-        }
         if context.scope == "cluster":
             task = (
                 "The user asked for a direct cluster attestation. Summarize the verdict "
@@ -287,20 +310,124 @@ class TriageOrchestrator(BaseAgent):
             task = (
                 "Follow-up turn. Answer the user's question; call a tool only when the "
                 "grounding data cannot answer it. "
-                + ("Attestation changed since last check: " + "; ".join(changes) + ". Lead with that. "
+                + ("The attestation changed since the last check; open with that change, "
+                   "in one sentence, before you answer the question. "
                    if changes else "")
                 + "Ground every claim in tool results or the grounding data."
             )
 
         yield self._event(
             self._phase("narrative", "start"),
-            {"grounding_text": json.dumps(grounding, ensure_ascii=False),
+            {"grounding_text": _grounding_text(context, in_scope, changes, app360_compact),
              "task_hint": task,
              "conversation_text": _transcript(ctx, user_text)},
         )
-        with tracer.start_as_current_span("agent.phase.narrative"):
-            async for event in self.analyst.run_async(ctx):
-                yield event
+        # F8: the analyst tier is the only part of a turn that depends on an
+        # inference backend, so it is the only part allowed to fail softly.
+        # The deterministic cards are already on the wire; losing the prose
+        # must read as a degraded answer, not as a crashed turn.
+        try:
+            with tracer.start_as_current_span("agent.phase.narrative"):
+                async for event in self.analyst.run_async(ctx):
+                    yield event
+        except Exception as exc:  # noqa: BLE001 - degrade, never propagate (F8, D1)
+            yield self._narrative_degraded(exc)
+
+    def _narrative_degraded(self, exc: BaseException) -> Event:
+        """The F8 notice: cards stand, analysis unavailable, correlation id."""
+        trace_id = format(trace.get_current_span().get_span_context().trace_id, "032x")
+        unreachable = _is_connection_error(exc)
+        reason = "inference_unreachable" if unreachable else "narrative_failed"
+        log.exception("orchestrator.narrative_failed", reason=reason, correlation_id=trace_id)
+        opening = (
+            "I could not reach the inference backend that writes up these results"
+            if unreachable
+            else "The narrative step failed while writing up these results"
+        )
+        return self._event(
+            fence("error", {"phase": "narrative", "correlation_id": trace_id, "reason": reason})
+            + f"\n{opening}, so there is no written analysis this turn. Everything above "
+            "still stands: the resolved context, the cluster health attestation, and any "
+            "Application 360 sections come from the deterministic check engine, not from "
+            "the model, and they were produced normally. Read the cards directly, or ask "
+            f"again once inference is back. Correlation id `{trace_id}` maps to the full "
+            "trace of this turn."
+        )
+
+
+def _scope_key(context: ResolvedContext) -> tuple[Any, ...]:
+    """What makes two turns the same triage scope (FR-CTX-7)."""
+    return (context.scope, context.application, context.environment, tuple(context.clusters))
+
+
+# Connection-shaped failures across the stacks the analyst can sit on: stdlib,
+# httpx, aiohttp, litellm. Matched by name (and through the __cause__ chain)
+# so this module never has to import an inference client to classify one.
+_CONNECTION_ERROR_NAMES = frozenset({
+    "APIConnectionError", "APITimeoutError", "ClientConnectorError",
+    "ClientConnectionError", "ConnectError", "ConnectTimeout", "ConnectTimeoutError",
+    "PoolTimeout", "ReadTimeout", "ReadTimeoutError", "ServerDisconnectedError",
+    "ServiceUnavailableError", "Timeout", "TransportError", "WriteTimeout",
+})
+
+
+def _is_connection_error(exc: BaseException) -> bool:
+    """Is this 'the inference backend is not there' rather than 'it broke'?
+
+    Worth distinguishing: unreachable earns a calmer, more accurate sentence
+    for the far more common case (backend down or misconfigured port).
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (ConnectionError, TimeoutError)):
+            return True
+        if type(current).__name__ in _CONNECTION_ERROR_NAMES:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _grounding_text(
+    context: ResolvedContext,
+    attestations: list[ClusterAttestation],
+    changes: list[AttestationChange],
+    app360_compact: list[dict[str, Any]],
+) -> str:
+    """The analyst's per-turn grounding: JSON evidence, led by any directive.
+
+    Two directives can precede the payload, and both are ordering decisions
+    the model must not be free to make: a verdict change leads the answer
+    (F5), and an unattestable cluster caps what may be claimed at all
+    (FR-ATT-5).
+    """
+    payload = {
+        "resolved_context": context.model_dump(mode="json"),
+        "attestation": {
+            a.cluster: {"verdict": a.verdict.value, "signals": a.signals[:6]}
+            for a in attestations
+        },
+        "attestation_changes": [c.model_dump(mode="json", by_alias=True) for c in changes],
+        "app360": app360_compact,
+    }
+    lead: list[str] = []
+    if changes:
+        lead.append(
+            "CHANGE SINCE THE LAST ATTESTATION (state this first, in one sentence, "
+            "before you answer the question): " + "; ".join(c.summary() for c in changes) + "."
+        )
+    unattestable = [a.cluster for a in attestations if a.verdict == ClusterVerdict.UNATTESTABLE]
+    if unattestable:
+        lead.append(
+            "CONFIDENCE CAP for " + ", ".join(unattestable) + ": the attestation came back "
+            "unattestable, which means the monitoring pipeline itself could not be trusted, "
+            "so platform health there CANNOT be confirmed. Say that plainly. Do not call "
+            "the cluster healthy and do not call it unhealthy; assert no cluster-level "
+            "conclusion about it at all. Treat any application finding on it as unverified "
+            "platform context, and put repairing monitoring first among the next steps."
+        )
+    return "\n\n".join([*lead, json.dumps(payload, ensure_ascii=False)])
 
 
 def _transcript(ctx: InvocationContext, current_user_text: str) -> str:
