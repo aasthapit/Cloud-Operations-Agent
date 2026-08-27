@@ -27,7 +27,11 @@ export default function App() {
 
   useEffect(() => {
     const poll = () => {
-      fetchMeta().then(setMeta).catch(() => undefined);
+      fetchMeta()
+        // Keep the previous object when nothing moved: a poll must not
+        // re-render the transcript mid-stream.
+        .then((next) => setMeta((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)))
+        .catch(() => undefined);
     };
     poll();
     const timer = setInterval(poll, META_POLL_MS);
