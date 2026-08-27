@@ -2,8 +2,8 @@
 # queries and to run a dead man's switch, not a production monitoring stack.
 #
 # live-prep.sh substitutes __CLUSTER_NAME__ with the fleet cluster name so
-# every series carries the `cluster` external label, matching the ACM/Thanos
-# convention the observability tools scope by.
+# every series carries a `cluster` label, matching the ACM/Thanos convention
+# the observability tools scope by.
 #
 # The live observability backend reaches this Service through the API server's
 # service proxy, so no NodePort and no port-forward are needed.
@@ -59,14 +59,25 @@ data:
         cluster: __CLUSTER_NAME__
     rule_files:
       - /etc/prometheus/rules/*.yaml
+    # Every job stamps the `cluster` label onto its own series. external_labels
+    # alone is not enough: it is applied on export (federation, remote write,
+    # alerting) but not to local query results, and the fleet convention is
+    # that ALL PromQL is scoped by cluster=..., including queries the agent
+    # writes against one cluster's own Prometheus.
     scrape_configs:
       - job_name: prometheus
         static_configs:
           - targets: [localhost:9090]
+        relabel_configs:
+          - target_label: cluster
+            replacement: __CLUSTER_NAME__
 
       - job_name: kube-state-metrics
         static_configs:
           - targets: [kube-state-metrics.monitoring.svc:8080]
+        relabel_configs:
+          - target_label: cluster
+            replacement: __CLUSTER_NAME__
 
       - job_name: kubernetes-apiservers
         kubernetes_sd_configs: [{ role: endpoints }]
@@ -80,6 +91,8 @@ data:
               [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
             action: keep
             regex: default;kubernetes;https
+          - target_label: cluster
+            replacement: __CLUSTER_NAME__
 
       # cAdvisor and kubelet come through the API server's node proxy: kind's
       # kubelet read-only port is closed and its serving cert is not trusted
@@ -99,6 +112,8 @@ data:
             target_label: __metrics_path__
             regex: (.+)
             replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+          - target_label: cluster
+            replacement: __CLUSTER_NAME__
 
       - job_name: kubernetes-kubelet
         kubernetes_sd_configs: [{ role: node }]
@@ -115,6 +130,8 @@ data:
             target_label: __metrics_path__
             regex: (.+)
             replacement: /api/v1/nodes/${1}/proxy/metrics
+          - target_label: cluster
+            replacement: __CLUSTER_NAME__
 ---
 apiVersion: v1
 kind: ConfigMap
