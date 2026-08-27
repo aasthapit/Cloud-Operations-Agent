@@ -13,7 +13,7 @@ Full product definition: [docs/PRD.md](docs/PRD.md) (canonical) and the review a
 Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+, and [Ollama](https://ollama.com) serving a tool-capable model:
 
 ```bash
-ollama pull qwen3:4b   # default; gpt-oss:20b is the documented quality escalation
+ollama pull gpt-oss:20b   # default; qwen3:4b is the documented fast alternative
 ```
 
 Then:
@@ -58,25 +58,59 @@ Everything behavioral lives under [config/](config/) and applies without restart
 
 Ollama is reached through its OpenAI-compatible endpoint by default (`provider: openai-compat`), so pointing at a hosted OpenAI-compatible gateway later is an env change, not a code change.
 
+### Model choice and latency
+
+The model lives in [config/models.yaml](config/models.yaml) under `inference`, alongside the provider, temperature, and output cap.
+The file hot-reloads, but `inference.*` binds when the agent process starts, because the ADK agent holds its model instance; the `agent.*` knobs below it (TTL, tool budget, auto-report) are re-read every turn.
+So changing the model means saving the file and restarting the agent, while changing a budget takes effect on the next message.
+
+`gpt-oss:20b` is the default because triage narration is the part users read, and it is the local model that keeps its reasoning out of the visible answer and its tool names straight.
+The cost is latency: a full narrative takes roughly 15-60 s on a developer laptop, and the first token can arrive well after the 2 s target in NFR-PERF-2.
+That target does not hold on a 20B model running locally, and this is an accepted deviation rather than a defect: the deterministic phases (context, attestation, Application 360) stream their cards long before the narrative starts, so the console fills with evidence while the model is still thinking.
+A hosted inference endpoint behind the same `openai-compat` provider is the path back inside the target, and it needs no code change.
+
+`qwen3:4b` is the fast alternative when you are iterating on prompts or flows and want turns in seconds.
+Its caveat is a thinking leak: this build ignores the `/no_think` soft switch the agent appends, so its chain-of-thought prose can open the visible answer.
+Keep it for development, not for demos or evaluation.
+
+`provider: fake` (or `CLOUDOPS_FAKE_LLM=1`, which selects it without editing committed config) swaps in a deterministic in-process model that answers instantly, never calls a tool, and never touches the network.
+It exists so the headless end-to-end test can exercise the whole chain without Ollama; it is not useful for anything a human reads.
+
 ## Telemetry
 
 One user turn forms one distributed trace: console, BFF, A2A, orchestrator phases, every check, every gateway call, every MCP tool, every LLM call, with `thread.id` on spans and logs throughout.
 
+Without an exporter the stack still runs; trace ids appear in logs for correlation.
+Logs are structured, redacted (bearer tokens, PEM blocks, secret-shaped env values, key-based masking), and stack traces never reach the client: errors carry a correlation id instead.
+
+### Tracing with Jaeger
+
+[deploy/docker-compose.yaml](deploy/docker-compose.yaml) brings up an OTLP collector fanning out to a Jaeger all-in-one; it is the only part of this project that wants Docker, and it is optional.
+
 ```bash
-make telemetry-up                                   # collector + Jaeger (docker)
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 make dev
-open http://localhost:16686                          # find traces by service cloudops.agent
+docker compose -f deploy/docker-compose.yaml up -d    # or: make telemetry-up
 ```
 
-Without the exporter the stack still runs; trace ids appear in logs for correlation.
-Logs are structured, redacted (bearer tokens, PEM blocks, secret-shaped env values, key-based masking), and stack traces never reach the client: errors carry a correlation id instead.
+Then point the services at the collector and restart the stack, because the exporter is read at process start:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 make dev
+```
+
+`OTEL_EXPORTER_OTLP_ENDPOINT` is the variable documented in [.env.example](.env.example), and `http://localhost:4318` is the collector's OTLP/HTTP port from the compose file; put it in your `.env` to avoid prefixing every run.
+Open the Jaeger UI at http://localhost:16686 and search the `cloudops.agent` service.
+Each user turn is one trace spanning all five services, tagged with `thread.id`, so you can pick a conversation out of the list and read the whole turn: context resolution, each check battery, each proxied gateway call, each MCP tool, and the LLM call.
+`make telemetry-down` stops the collector and Jaeger; the stack keeps running without them.
 
 ## Development
 
 ```bash
-make check    # ruff + mypy + tsc + pytest (44 tests)
+make check    # ruff + mypy + tsc + pytest (62 tests)
 make test
 ```
+
+The suite is hermetic: it needs no Ollama, no Docker, and no pre-running service, and it never binds a dev port.
+[backend/tests/test_e2e_triage.py](backend/tests/test_e2e_triage.py) boots both MCP servers and the gateway in-process on kernel-assigned ports, drives a full triage turn through the fake model, and asserts the typed payloads the console consumes.
 
 Layout: [backend/src/cloudops/](backend/src/cloudops/) (agent, gateway, MCP servers, shared infra, mock fleet), [frontend/](frontend/) (Express BFF + React SPA), [docs/](docs/) (PRD, user flows, research notes, source checklist transcription).
 
