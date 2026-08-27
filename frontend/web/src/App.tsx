@@ -12,8 +12,34 @@ import type { ConsoleMeta, Persona } from "./types";
 /** Config-plane poll: a rejected reload must appear without a page reload (FR-CFG-3). */
 const META_POLL_MS = 5000;
 
+/** Threads survive page reloads (the server keeps the ADK session by
+ * contextId anyway; losing the rendered transcript to a refresh read as
+ * "my App 360 disappeared"). sessionStorage keeps it per-tab; a failed
+ * or blocked read simply starts fresh. */
+const PERSIST_KEY = "cloudops.thread.v1";
+
+function loadPersisted(): typeof initialState {
+  try {
+    const raw = sessionStorage.getItem(PERSIST_KEY);
+    if (!raw) return initialState;
+    const saved = JSON.parse(raw) as typeof initialState;
+    // A reload mid-stream loses the in-flight turn; never resurrect busy.
+    return { ...initialState, ...saved, busy: false, suppressText: false };
+  } catch {
+    return initialState;
+  }
+}
+
 export default function App() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState, loadPersisted);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(PERSIST_KEY, JSON.stringify(state));
+    } catch {
+      // Quota or privacy mode: persistence is a convenience, not a contract.
+    }
+  }, [state]);
   const [users, setUsers] = useState<Persona[]>([]);
   const [selected, setSelected] = useState("");
   const [meta, setMeta] = useState<ConsoleMeta>({ mode: "…", env: "dev", configVersion: "" });
