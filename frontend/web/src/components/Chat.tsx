@@ -127,7 +127,12 @@ export function Chat(props: {
                 return (
                   <div className="bubble agent" key={i}>
                     <div className="who">Agent</div>
-                    <span className="pill error">error</span> {item.payload.message}{" "}
+                    <span className="pill error">error</span>{" "}
+                    {/* Agent error fences carry no message field; the prose arrives as a separate narrative item. */}
+                    {(item.payload.message as string | undefined) ??
+                      (item.payload.phase === "narrative"
+                        ? "Narrative analysis is unavailable for this turn; the cards above stand."
+                        : "This turn could not be completed.")}{" "}
                     <span className="mono">correlation {item.payload.correlation_id}</span>
                   </div>
                 );
