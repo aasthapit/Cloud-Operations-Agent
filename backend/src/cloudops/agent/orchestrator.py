@@ -165,7 +165,10 @@ class TriageOrchestrator(BaseAgent):
             # --- context gate -------------------------------------------
             with tracer.start_as_current_span("agent.phase.context_resolution"):
                 outcome, pending = await ctx_resolution.resolve(
-                    claims, user_text, registry, gc, prior, state.get("pending_clarify")
+                    claims, user_text, registry, gc, prior, state.get("pending_clarify"),
+                    # FR-CTX-8: hot-read, so flipping the default (or turning it
+                    # off with `default_environment: null`) lands next message.
+                    {"default_environment": tuning.get("default_environment", "prod")},
                 )
 
             if isinstance(outcome, Onboarding):
@@ -397,9 +400,10 @@ def _grounding_text(
 ) -> str:
     """The analyst's per-turn grounding: JSON evidence, led by any directive.
 
-    Two directives can precede the payload, and both are ordering decisions
+    Three directives can precede the payload, and all are ordering decisions
     the model must not be free to make: a verdict change leads the answer
-    (F5), and an unattestable cluster caps what may be claimed at all
+    (F5), an assumed environment must be disclosed with its escape hatch
+    (FR-CTX-8), and an unattestable cluster caps what may be claimed at all
     (FR-ATT-5).
     """
     payload = {
@@ -416,6 +420,14 @@ def _grounding_text(
         lead.append(
             "CHANGE SINCE THE LAST ATTESTATION (state this first, in one sentence, "
             "before you answer the question): " + "; ".join(c.summary() for c in changes) + "."
+        )
+    if context.environment_assumed:
+        other = "nonprod" if context.environment == "prod" else "prod"
+        lead.append(
+            f"ASSUMED ENVIRONMENT: the user did not say which environment, so this "
+            f"whole answer covers {context.environment}. Say so near the top, in one "
+            f"sentence, and add that they can say 'switch to {other}' to move the "
+            "thread. Do not ask them which environment they meant."
         )
     unattestable = [a.cluster for a in attestations if a.verdict == ClusterVerdict.UNATTESTABLE]
     if unattestable:

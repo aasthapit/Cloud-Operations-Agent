@@ -204,3 +204,7 @@ class ResolvedContext(BaseModel):
     instances: list[AppInstance] = Field(default_factory=list)
     clusters: list[str] = Field(default_factory=list)
     outside_registered_set: bool = False  # user-named app not in their set (F3)
+    # FR-CTX-8: the environment was not stated and was taken from the configured
+    # default rather than asked about. Every surface that shows the environment
+    # must show the assumption too (context fence, rail, narrative).
+    environment_assumed: bool = False

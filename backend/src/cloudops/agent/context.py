@@ -1,4 +1,4 @@
-"""User context resolution (FR-CTX-1..7): claims -> applications -> placements.
+"""User context resolution (FR-CTX-1..8): claims -> applications -> placements.
 
 Pure decision logic plus gateway lookups; no LLM. The orchestrator calls
 resolve() every turn and acts on the outcome:
@@ -9,6 +9,13 @@ resolve() every turn and acts on the outcome:
 
 Placement is ALWAYS verified through obs__find_app_placements (Prometheus
 series in live mode), never assumed from the registry (FR-CTX-2).
+
+Application ambiguity always asks; environment ambiguity does not have to.
+FR-CTX-8 gives the environment a configured default (policy["default_environment"],
+carried from the hot agent tuning by the orchestrator): when the application is
+resolved, the environment is unstated, and the app runs in the default, the turn
+resolves there and marks the context environment_assumed instead of spending the
+user's one question on it. Setting the policy to None restores strict asking.
 """
 
 from __future__ import annotations
@@ -133,11 +140,15 @@ async def resolve(
     client: GatewayClient,
     prior: ResolvedContext | None,
     pending: dict[str, Any] | None,
+    policy: dict[str, Any] | None = None,
 ) -> tuple[Outcome, dict[str, Any] | None]:
     """One resolution step. Returns (outcome, new_pending_clarification).
 
     `pending` is the clarification asked last turn ({kind, options,
     application?}); the user's reply is interpreted against it first.
+
+    `policy` carries the hot-read resolution knobs; only
+    {"default_environment": str | None} is read today (FR-CTX-8).
     """
     # -- unauthenticated: onboarding only, no checks (FR-ID-4) --------------
     if not claims.sub:
@@ -261,11 +272,20 @@ async def resolve(
         # a thread that has been in prod for ten turns is an interrogation
         # the user already answered.
         chosen_env = prior.environment
+    assumed = False
     if chosen_env is None and len(envs) > 1:
-        return Clarify(
-            f"{chosen_app['application']} runs in {len(envs)} environments. Which one?",
-            envs, "environment",
-        ), {"kind": "environment", "options": envs, "application": chosen_app["application"]}
+        # FR-CTX-8: most applications span environments, so asking here would
+        # cost the F1 promise ("zero questions asked") its most common case.
+        # The default answers it when the app actually runs there; when it does
+        # not, or the policy is off, the question is still the only honest move.
+        default_env = (policy or {}).get("default_environment")
+        if default_env in envs:
+            chosen_env, assumed = default_env, True
+        else:
+            return Clarify(
+                f"{chosen_app['application']} runs in {len(envs)} environments. Which one?",
+                envs, "environment",
+            ), {"kind": "environment", "options": envs, "application": chosen_app["application"]}
     env = chosen_env if chosen_env in envs else (chosen_env or envs[0])
     scoped = [p for p in placements if p["environment"] == env] or placements
 
@@ -277,8 +297,8 @@ async def resolve(
         scope="app", user_sub=claims.sub, user_name=claims.name, groups=claims.groups,
         application=chosen_app["application"], app_label=app_label, environment=env,
         instances=instances, clusters=sorted({i.cluster for i in instances}),
-        outside_registered_set=outside,
+        outside_registered_set=outside, environment_assumed=assumed,
     )
     log.info("context.resolved", application=context.application, environment=env,
-             clusters=context.clusters, outside=outside)
+             clusters=context.clusters, outside=outside, environment_assumed=assumed)
     return Resolved(context), None
