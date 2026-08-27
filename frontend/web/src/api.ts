@@ -3,7 +3,7 @@
  * The stream reader parses `data:` frames into StreamEvent objects and
  * hands them to the caller's callback in arrival order.
  */
-import type { Persona, StreamEvent } from "./types";
+import type { ConsoleMeta, Persona, StreamEvent } from "./types";
 
 export async function fetchUsers(): Promise<Persona[]> {
   const res = await fetch("/api/users");
@@ -11,9 +11,9 @@ export async function fetchUsers(): Promise<Persona[]> {
   return body.users;
 }
 
-export async function fetchMeta(): Promise<{ mode: string; env: string; configVersion: string }> {
+export async function fetchMeta(): Promise<ConsoleMeta> {
   const res = await fetch("/api/meta");
-  return (await res.json()) as { mode: string; env: string; configVersion: string };
+  return (await res.json()) as ConsoleMeta;
 }
 
 export async function streamChat(

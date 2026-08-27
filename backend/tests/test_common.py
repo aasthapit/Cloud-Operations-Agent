@@ -39,6 +39,35 @@ class TestHotConfig:
         assert asyncio.run(cfg.reload()) is True
         assert cfg.value["value"] == 2
 
+    def test_last_error_is_recorded_then_cleared(self, tmp_path):
+        """FR-CFG-3: a refused edit is retained, not only logged, so the
+        console rail can show which file was rejected and why (gap G6)."""
+        import asyncio
+
+        f = tmp_path / "battery.yaml"
+        f.write_text("value: 1\n")
+        cfg = HotConfig(f, validator=lambda d: d)
+        assert cfg.last_error is None
+        assert cfg.snapshot() == {"file": "battery.yaml", "last_error": None}
+
+        f.write_text("value: [unclosed\n")
+        assert asyncio.run(cfg.reload()) is False
+        err = cfg.last_error
+        assert err is not None
+        assert err.file == "battery.yaml"
+        assert err.message  # the parser's reason, not a generic string
+        assert err.at
+        assert cfg.snapshot()["last_error"] == err.as_dict()
+
+        # An unchanged bad file keeps the error standing (no reload churn).
+        assert asyncio.run(cfg.reload()) is False
+        assert cfg.last_error == err
+
+        f.write_text("value: 2\n")
+        assert asyncio.run(cfg.reload()) is True
+        assert cfg.last_error is None
+        assert cfg.snapshot()["last_error"] is None
+
     def test_boot_failure_is_loud(self, tmp_path):
         f = tmp_path / "bad.yaml"
         f.write_text(": : :")

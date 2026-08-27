@@ -71,11 +71,43 @@ app.get("/api/users", (_req, res) => {
   }
 });
 
-app.get("/api/meta", (_req, res) => {
+interface AgentStatus {
+  config_version: string;
+  batteries: { attestation: { checks: number }; app360: { checks: number } };
+  last_error: { file: string; message: string; at: string } | null;
+}
+
+/**
+ * Agent-side config status (FR-CFG-3): version, battery counts, and the
+ * last rejected reload. Short timeout because /api/meta is polled by the
+ * rail; when the agent is down the console still gets file-derived values.
+ */
+async function agentStatus(): Promise<AgentStatus | null> {
+  try {
+    const res = await fetch(new URL("/status", config.agentUrl), {
+      signal: AbortSignal.timeout(1500),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AgentStatus;
+  } catch (err) {
+    logger.debug({ err }, "meta.agent_status_unavailable");
+    return null;
+  }
+}
+
+app.get("/api/meta", async (_req, res) => {
+  const status = await agentStatus();
   res.json({
     mode: config.backendMode,
     env: config.env,
-    configVersion: configVersion(),
+    // The agent hashes the same file set; its answer wins when it is up so
+    // the chip and the reload error come from one reading of the plane.
+    configVersion: status?.config_version ?? configVersion(),
+    agentReachable: status !== null,
+    batteries: status
+      ? { attestation: status.batteries.attestation.checks, app360: status.batteries.app360.checks }
+      : null,
+    reloadError: status?.last_error ?? null,
   });
 });
 

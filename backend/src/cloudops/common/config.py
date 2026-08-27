@@ -9,9 +9,15 @@ Two consumption styles, matching the PRD's two reload paths (Figure 6):
 2. `HotConfig` - structured YAML with validate-then-swap semantics:
      cfg = HotConfig(path, validator=SomeModel.model_validate)
      cfg.value            # current validated value (last known good)
+     cfg.last_error       # the last rejected reload, or None (FR-CFG-3)
+     cfg.snapshot()       # JSON-ready {file, last_error} for /status
      await cfg.watch(...) # watchfiles loop; on change: parse + validate,
                           # atomic swap on success, keep last known good and
                           # log the error on failure (FR-CFG-3)
+
+   A rejected reload is not only logged: it is retained on the instance so
+   the operator surface (agent /status -> BFF /api/meta -> console rail) can
+   SHOW which file was refused and why, per FR-CFG-3.
 
 Env interpolation: string values support ${VAR} and ${VAR:default}
 (FR-CFG-5), resolved at load time so a reload also picks up... the same
@@ -26,6 +32,8 @@ import hashlib
 import os
 import re
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +81,18 @@ def config_version(paths: list[Path]) -> str:
     return digest.hexdigest()[:7]
 
 
+@dataclass(frozen=True, slots=True)
+class ReloadError:
+    """One rejected reload, kept for the operator surface (FR-CFG-3)."""
+
+    file: str      # basename; the console shows it next to the reason
+    message: str
+    at: str        # ISO-8601 UTC
+
+    def as_dict(self) -> dict[str, str]:
+        return {"file": self.file, "message": self.message, "at": self.at}
+
+
 class HotConfig[T]:
     """A validated YAML file with last-known-good hot reload."""
 
@@ -85,28 +105,62 @@ class HotConfig[T]:
         self.path = path
         self._validator = validator
         self._on_reload = on_reload
+        self._last_error: ReloadError | None = None
         self._value: T = self._load()  # first load MUST succeed: fail fast at boot
+        self._digest: str | None = self._file_digest()
         log.info("config.loaded", file=str(path))
 
     def _load(self) -> T:
         return self._validator(load_yaml(self.path))
 
+    def _file_digest(self) -> str | None:
+        try:
+            return hashlib.sha1(self.path.read_bytes()).hexdigest()
+        except OSError:
+            return None  # unreadable: let reload() run and record the real error
+
     @property
     def value(self) -> T:
         return self._value
 
+    @property
+    def last_error(self) -> ReloadError | None:
+        """The last rejected reload, or None once a good load lands."""
+        return self._last_error
+
+    def snapshot(self) -> dict[str, Any]:
+        """JSON-ready view for status endpoints (agent /status -> BFF)."""
+        return {
+            "file": self.path.name,
+            "last_error": self._last_error.as_dict() if self._last_error else None,
+        }
+
     async def reload(self) -> bool:
         """Parse + validate + swap. Returns True when a new version landed.
 
-        On any error the previous value stays active (FR-CFG-3) and the
-        validation error is logged at warning so operators see it.
+        On any error the previous value stays active (FR-CFG-3), the
+        validation error is logged at warning, and it is retained as
+        `last_error` so the console can surface it.
         """
+        digest = self._file_digest()
+        # Identical bytes: watchfiles fires on touch-only events and /status
+        # polls this path, so re-validating would only add log noise. A
+        # standing last_error survives, because the bad file is still on disk.
+        if digest is not None and digest == self._digest:
+            return False
+        self._digest = digest
         try:
             new_value = self._load()
         except Exception as exc:  # noqa: BLE001 - any config error must not crash the service
+            self._last_error = ReloadError(
+                file=self.path.name,
+                message=str(exc)[:400],
+                at=datetime.now(UTC).isoformat(),
+            )
             log.warning("config.reload_rejected", file=str(self.path), error=str(exc))
             return False
         self._value = new_value
+        self._last_error = None
         log.info("config.reload", file=str(self.path))
         if self._on_reload is not None:
             result = self._on_reload(new_value)

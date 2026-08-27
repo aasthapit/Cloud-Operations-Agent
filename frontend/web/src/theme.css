@@ -105,6 +105,16 @@ body {
 .pill.info, .pill.maintenance, .pill.streaming { color: var(--info); background: var(--info-bg); }
 .pill.dim, .pill.manual, .pill.registry, .pill.idle { color: var(--muted); background: var(--neutral-bg); }
 
+/* ---------- rejected config reload (FR-CFG-3) ---------- */
+.reload-error {
+  margin-top: 7px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--warn-bg); border: 1px solid var(--warn);
+  border-left-width: 3px; border-radius: 4px; color: var(--warn);
+}
+.reload-error .file { font-size: 10.5px; font-weight: 600; }
+.reload-error .why { font-size: 11px; line-height: 1.35; word-break: break-word; }
+.reload-error .lkg { font-size: 10.5px; color: var(--muted); }
+
 /* ---------- attestation rows ---------- */
 .attrow {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -180,6 +190,13 @@ body {
 }
 .evidence .hl { color: var(--ink); }
 .evidence a { color: var(--band); }
+.evidence .copy-evidence {
+  align-self: flex-start; margin-top: 4px;
+  border: 1px solid var(--line-strong); border-radius: 5px; padding: 1px 8px;
+  font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.evidence .copy-evidence:hover { background: var(--surface2); color: var(--ink); }
 .exports { display: flex; gap: 8px; padding: 8px 11px; background: var(--surface2); }
 .exports button {
   border: 1px solid var(--line-strong); border-radius: 5px; padding: 3px 12px;

@@ -1,12 +1,14 @@
 /**
  * Left rail: resolved context (FR-CTX-6), the attestation card with
  * expandable per-cluster detailed attestation (FR-ATT-8/9), and the
- * check-battery/config-version card (user flow F9's visibility).
+ * check-battery/config-version card (user flow F9's visibility, plus the
+ * last rejected config reload per FR-CFG-3).
  */
 import { useState } from "react";
 
 import { attestationMarkdown, download } from "../export";
-import type { AttestationReport, CheckResult, ContextPayload } from "../types";
+import type { AttestationReport, CheckResult, ContextPayload, ReloadError } from "../types";
+import { Evidence } from "./ReportCard";
 
 export function ContextCard(props: { context: ContextPayload | null }) {
   const ctx = props.context;
@@ -43,29 +45,6 @@ export function ContextCard(props: { context: ContextPayload | null }) {
   );
 }
 
-function EvidenceBlock(props: { check: CheckResult }) {
-  const ev = props.check.evidence;
-  return (
-    <div className="evidence">
-      <span className="hl">
-        check {props.check.id} - tool {ev.tool} - {ev.timestamp.slice(11, 19)}
-      </span>
-      {ev.triggered_rules.map((rule, i) => (
-        <span key={i}>
-          {rule.path} {rule.op} {JSON.stringify(rule.value)} - observed {JSON.stringify(rule.observed)} - {rule.outcome}
-        </span>
-      ))}
-      {props.check.observed && <span>observed: {props.check.observed}</span>}
-      {ev.error && <span>error: {ev.error}</span>}
-      {ev.runbook && (
-        <span>
-          runbook: <a href={ev.runbook} target="_blank" rel="noreferrer">{ev.runbook.split("/").slice(-1)[0]}</a>
-        </span>
-      )}
-    </div>
-  );
-}
-
 /** The full battery for one cluster, passes included (FR-ATT-9). */
 function DetailedAttestation(props: { checks: CheckResult[] }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -84,7 +63,7 @@ function DetailedAttestation(props: { checks: CheckResult[] }) {
             </span>
             <span className={`pill ${check.status}`}>{check.status}</span>
           </div>
-          {open === check.id && <EvidenceBlock check={check} />}
+          {open === check.id && <Evidence check={check} />}
         </div>
       ))}
     </div>
@@ -143,10 +122,15 @@ export function ChecksCard(props: {
   attestationChecks: number | null;
   app360Checks: number | null;
   configVersion: string;
+  reloadError?: ReloadError | null;
 }) {
+  const err = props.reloadError;
   return (
     <div className="card">
-      <div className="hd">Checks</div>
+      <div className="hd">
+        Checks
+        {err && <span className="pill warn">reload rejected</span>}
+      </div>
       <div className="bd">
         <div className="kv">
           <span className="k">Attestation battery</span>
@@ -160,6 +144,15 @@ export function ChecksCard(props: {
           <span className="k">Config version</span>
           <span className="v mono">{props.configVersion || "-"}</span>
         </div>
+        {/* FR-CFG-3: the last known good stays live, but the operator has to
+            SEE that their edit was refused, and why. */}
+        {err && (
+          <div className="reload-error" title={err.at}>
+            <span className="file mono">{err.file.split("/").slice(-1)[0]}</span>
+            <span className="why">{err.message}</span>
+            <span className="lkg">Last known good config is still serving conversations.</span>
+          </div>
+        )}
       </div>
     </div>
   );

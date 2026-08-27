@@ -2,20 +2,42 @@
  * The Application 360 report card (FR-UI-1/2/7, FR-360-6/7/9): 18 sections
  * as expandable rows, each check opening to its embedded evidence trail;
  * manual and registry rows render labeled instead of disappearing.
+ *
+ * The Evidence trail is exported: the rail's detailed attestation renders
+ * the same component, so one drill-down surface serves both cards.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { app360Markdown, download } from "../export";
+import { app360Markdown, download, evidenceText } from "../export";
 import type { App360Report, CheckResult } from "../types";
 
-function Evidence(props: { check: CheckResult }) {
+export function Evidence(props: { check: CheckResult }) {
   const ev = props.check.evidence;
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(evidenceText(props.check));
+      setCopied(true);
+    } catch {
+      // No clipboard outside a secure context; the trail is on screen
+      // anyway, so stay quiet rather than alarming the operator.
+    }
+  };
+
   return (
     <div className="evidence">
       <span className="hl">
         check {props.check.id} - tool {ev.tool} - {ev.timestamp.slice(11, 19)}
       </span>
       <span>args: {JSON.stringify(ev.args)}</span>
+      {props.check.observed && <span>observed: {props.check.observed}</span>}
       {ev.triggered_rules.map((rule, i) => (
         <span key={i}>
           {/* value-less ops (not_empty, is_true...) read badly as "vs op null" */}
@@ -30,6 +52,13 @@ function Evidence(props: { check: CheckResult }) {
           runbook: <a href={ev.runbook} target="_blank" rel="noreferrer">{ev.runbook.split("/").slice(-1)[0]}</a>
         </span>
       )}
+      <button
+        className="copy-evidence"
+        onClick={copy}
+        title="Copy this evidence trail as plain text"
+      >
+        {copied ? "copied" : "copy evidence"}
+      </button>
     </div>
   );
 }

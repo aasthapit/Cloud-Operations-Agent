@@ -7,20 +7,35 @@ import { ActivityLog } from "./components/ActivityLog";
 import { Masthead } from "./components/Masthead";
 import { AttestationCard, ChecksCard, ContextCard } from "./components/Rail";
 import { initialState, reducer } from "./state";
-import type { Persona } from "./types";
+import type { ConsoleMeta, Persona } from "./types";
+
+/** Config-plane poll: a rejected reload must appear without a page reload (FR-CFG-3). */
+const META_POLL_MS = 5000;
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [users, setUsers] = useState<Persona[]>([]);
   const [selected, setSelected] = useState("");
-  const [meta, setMeta] = useState({ mode: "…", env: "dev", configVersion: "" });
+  const [meta, setMeta] = useState<ConsoleMeta>({ mode: "…", env: "dev", configVersion: "" });
 
   useEffect(() => {
     fetchUsers().then((list) => {
       setUsers(list);
       if (list.length > 0) setSelected(list[0].sub);
     });
-    fetchMeta().then(setMeta).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const poll = () => {
+      fetchMeta()
+        // Keep the previous object when nothing moved: a poll must not
+        // re-render the transcript mid-stream.
+        .then((next) => setMeta((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)))
+        .catch(() => undefined);
+    };
+    poll();
+    const timer = setInterval(poll, META_POLL_MS);
+    return () => clearInterval(timer);
   }, []);
 
   const send = (text: string) => {
@@ -44,13 +59,20 @@ export default function App() {
           <ContextCard context={state.context} />
           <AttestationCard report={state.attestation} />
           <ChecksCard
-            attestationChecks={state.attestation ? state.attestation.clusters[0]?.checks.length ?? null : null}
+            // Counts come from the last run when there is one, and from the
+            // agent's loaded batteries before the first turn.
+            attestationChecks={
+              state.attestation
+                ? state.attestation.clusters[0]?.checks.length ?? null
+                : meta.batteries?.attestation ?? null
+            }
             app360Checks={
               state.lastApp360
                 ? state.lastApp360.sections.reduce((n, s) => n + s.checks.length, 0)
-                : null
+                : meta.batteries?.app360 ?? null
             }
             configVersion={meta.configVersion}
+            reloadError={meta.reloadError ?? null}
           />
         </div>
         <Chat items={state.items} busy={state.busy} onSend={send} />
