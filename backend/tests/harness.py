@@ -57,6 +57,27 @@ def service_env(monkeypatch: Any, **env: str) -> Iterator[None]:
         get_settings.cache_clear()
 
 
+def _clear_sse_shutdown_latch() -> None:
+    """Undo sse_starlette's process-global shutdown latch.
+
+    sse_starlette drains SSE responses gracefully when uvicorn stops, and it
+    tracks that with a CLASS attribute, `AppStatus.should_exit`. It is set
+    once and never cleared, on the assumption that a process hosts one server
+    for its lifetime. A test session hosts many: the first server we stop
+    latches it, and from then on every EventSourceResponse in the process
+    ends before writing a body - which is the transport MCP streamable HTTP
+    runs on, so every later MCP request in the session hangs or dies with an
+    incomplete chunked read, in whatever test happens to run next.
+
+    Clearing it around every start and stop keeps servers isolated. Graceful
+    drain stays enabled, so shutdown still ends open streams instead of
+    blocking on them.
+    """
+    from sse_starlette.sse import AppStatus
+
+    AppStatus.should_exit = False
+
+
 @asynccontextmanager
 async def serve_asgi(app: Any, port: int) -> AsyncIterator[None]:
     """Run an ASGI app on 127.0.0.1:port for the body of the block.
@@ -65,6 +86,7 @@ async def serve_asgi(app: Any, port: int) -> AsyncIterator[None]:
     watchers only start from the app's lifespan, and a mounted sub-app's
     lifespan does not run on its own.
     """
+    _clear_sse_shutdown_latch()
     server = uvicorn.Server(
         uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", lifespan="on")
     )
@@ -75,6 +97,7 @@ async def serve_asgi(app: Any, port: int) -> AsyncIterator[None]:
     finally:
         server.should_exit = True
         await task
+        _clear_sse_shutdown_latch()
 
 
 @asynccontextmanager
