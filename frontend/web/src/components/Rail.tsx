@@ -6,7 +6,7 @@
 import { useState } from "react";
 
 import { attestationMarkdown, download } from "../export";
-import type { AttestationReport, CheckResult, ContextPayload } from "../types";
+import type { AttestationReport, CheckResult, ContextPayload, ReloadError } from "../types";
 
 export function ContextCard(props: { context: ContextPayload | null }) {
   const ctx = props.context;
@@ -143,10 +143,15 @@ export function ChecksCard(props: {
   attestationChecks: number | null;
   app360Checks: number | null;
   configVersion: string;
+  reloadError?: ReloadError | null;
 }) {
+  const err = props.reloadError;
   return (
     <div className="card">
-      <div className="hd">Checks</div>
+      <div className="hd">
+        Checks
+        {err && <span className="pill warn">reload rejected</span>}
+      </div>
       <div className="bd">
         <div className="kv">
           <span className="k">Attestation battery</span>
@@ -160,6 +165,15 @@ export function ChecksCard(props: {
           <span className="k">Config version</span>
           <span className="v mono">{props.configVersion || "-"}</span>
         </div>
+        {/* FR-CFG-3: the last known good stays live, but the operator has to
+            SEE that their edit was refused, and why. */}
+        {err && (
+          <div className="reload-error" title={err.at}>
+            <span className="file mono">{err.file.split("/").slice(-1)[0]}</span>
+            <span className="why">{err.message}</span>
+            <span className="lkg">Last known good config is still serving conversations.</span>
+          </div>
+        )}
       </div>
     </div>
   );

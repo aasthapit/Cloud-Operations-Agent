@@ -56,6 +56,8 @@ export interface SectionResult {
   checks: CheckResult[];
   registry_facts: Record<string, unknown>;
   manual_items: string[];
+  /** Analyst-authored, grounded in this section's checks (FR-360-4). */
+  findings?: string;
 }
 
 export interface App360Report {
@@ -67,6 +69,11 @@ export interface App360Report {
   environment: string;
   overall_status: "healthy" | "at_risk" | "critical";
   sections: SectionResult[];
+  /** Narrative slots of the organization's template (FR-360-4); empty when
+   * the analyst wrote the prose into the transcript only. */
+  executive_summary?: string;
+  recommendations?: string[];
+  final_reason?: string;
   report_date: string;
   battery_version: string;
 }
@@ -102,6 +109,23 @@ export interface Persona {
   name: string;
   email: string;
   groups: string[];
+}
+
+/** A config edit the agent refused; the last known good stays live (FR-CFG-3). */
+export interface ReloadError {
+  file: string;
+  message: string;
+  at: string;
+}
+
+/** GET /api/meta: the BFF's own facts plus the agent's config status. */
+export interface ConsoleMeta {
+  mode: string;
+  env: string;
+  configVersion: string;
+  agentReachable?: boolean;
+  batteries?: { attestation: number; app360: number } | null;
+  reloadError?: ReloadError | null;
 }
 
 /** SSE events from the BFF (server/src/index.ts is the emitter). */
