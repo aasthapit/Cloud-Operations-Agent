@@ -184,6 +184,23 @@ async def test_zero_question_triage(stack: Runner) -> None:
 
 
 @pytest.mark.asyncio(loop_scope="module")
+async def test_vague_question_assumes_the_default_environment(stack: Runner) -> None:
+    """FR-CTX-8: a sentence naming neither app nor environment still runs the
+    whole pipeline; the assumption rides on the context fence, not on a question."""
+    turn = await run_turn(stack, "e2e-f1-vague", CLAIMS["app_developer"], "is my app down")
+
+    context = turn.one("context")
+    assert context["application"] == "payments-api"
+    assert context["environment"] == "prod"
+    assert context["environment_assumed"] is True
+
+    assert turn.of("clarify") == []
+    assert turn.one("attestation")["clusters"]
+    reports = turn.of("app360")
+    assert {r["cluster"] for r in reports} == {"prod-east-1", "prod-east-2"}
+
+
+@pytest.mark.asyncio(loop_scope="module")
 async def test_ambiguous_question_asks_once_and_runs_nothing(stack: Runner) -> None:
     """F2: exactly one question, and the check phases never start (FR-CTX-4)."""
     turn = await run_turn(stack, "e2e-f2", CLAIMS["platform_sre"], "is my stuff healthy?")
