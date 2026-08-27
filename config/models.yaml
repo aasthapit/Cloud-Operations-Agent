@@ -16,6 +16,9 @@ inference:
   #   ollama-chat: LiteLLM's native ollama_chat provider. Fall back to this
   #     if a model misbehaves in tool loops over the OpenAI-compat surface
   #     (ADK docs note ollama_chat has the most battle-tested tool calling).
+  #   fake: hermetic stand-in that answers deterministically without any
+  #     inference server or network (NFR-QE-1). The headless E2E test uses
+  #     it; setting CLOUDOPS_FAKE_LLM=1 selects it without editing this file.
   provider: openai-compat
 
   # Model served by the local Ollama instance. Must support tool calling.
