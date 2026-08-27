@@ -833,6 +833,7 @@
     <div class="req"><div class="rid">FR-CTX-5</div><div class="rtx">If the user has no registered applications, the agent <span class="kw">MUST</span> explain the registration path and <span class="kw">MAY</span> proceed on a user-named application.</div></div>
     <div class="req"><div class="rid">FR-CTX-6</div><div class="rtx">Resolved context <span class="kw">MUST</span> be visible in a console panel (who, applications, clusters, namespaces) and stored in session state.</div></div>
     <div class="req"><div class="rid">FR-CTX-7</div><div class="rtx">The user <span class="kw">MUST</span> be able to override resolved context conversationally (&ldquo;look at the dev instance instead&rdquo;).</div></div>
+    <div class="req"><div class="rid">FR-CTX-8</div><div class="rtx">When the application is resolved but only the environment is ambiguous, the system <span class="kw">MUST</span> resolve to the configured default environment (prod unless overridden) when the application runs there, <span class="kw">MUST</span> mark the environment as assumed everywhere it is shown (context panel, context payload, and the narrative, which states the assumption and how to switch), and <span class="kw">MUST NOT</span> ask; when the application does not run in the default environment, or the default is disabled in configuration, the system <span class="kw">MUST</span> clarify per FR-CTX-4.</div></div>
   </div>
 
   <h3>7.2 Cluster health attestation (FR-ATT)</h3>

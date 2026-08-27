@@ -229,6 +229,7 @@ Model, temperature, and loop budget live in `models.yaml`, hot-reloaded.
 - FR-CTX-5. If the user has no registered applications, the agent MUST explain the registration path and MAY proceed on a user-named application.
 - FR-CTX-6. Resolved context MUST be visible to the user in a console panel (who, applications, clusters, namespaces) and stored in session state.
 - FR-CTX-7. The user MUST be able to override resolved context conversationally ("look at the dev instance instead").
+- FR-CTX-8. When the application is resolved but only the environment is ambiguous, the system MUST resolve to the configured default environment (prod unless overridden) when the application runs there, MUST mark the environment as assumed everywhere it is shown (context panel, context payload, and the narrative, which states the assumption and how to switch), and MUST NOT ask; when the application does not run in the default environment, or the default is disabled in configuration, the system MUST clarify per FR-CTX-4.
 
 ### 7.2 Cluster health attestation (FR-ATT)
 
