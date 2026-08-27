@@ -230,3 +230,34 @@ body {
 .log .tone-warn { color: #d9ae56; }
 .log .tone-crit { color: #e57781; }
 .log .tone-dim { color: #8a909a; }
+
+/* ---------- full-screen card overlay ---------- */
+/* Reading a tall report through the chat's scroll window is miserable;
+   any card can maximize into this fixed overlay instead (Esc or the
+   backdrop closes it). Fixed positioning escapes the chat's overflow
+   context, so the panel gets the whole viewport regardless of layout. */
+.overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(20, 22, 27, 0.5);
+  display: flex; padding: 24px;
+}
+.overlay-panel {
+  margin: auto; width: min(980px, 100%); max-height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.overlay-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  background: var(--surface2); font-weight: 600; font-size: 12.5px;
+}
+.overlay-body { overflow-y: auto; min-height: 0; }
+.overlay-report { border: none; border-radius: 0; }
+.icon-btn {
+  border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface);
+  color: var(--muted); font-family: var(--mono); font-size: 10px;
+  padding: 2px 8px; cursor: pointer; white-space: nowrap;
+}
+.icon-btn:hover { color: var(--ink); background: var(--paper); }

@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { attestationMarkdown, download } from "../export";
 import type { AttestationReport, CheckResult, ContextPayload, ReloadError } from "../types";
-import { Evidence } from "./ReportCard";
+import { Evidence, Overlay } from "./ReportCard";
 
 export function ContextCard(props: { context: ContextPayload | null }) {
   const ctx = props.context;
@@ -75,6 +75,7 @@ function DetailedAttestation(props: { checks: CheckResult[] }) {
 
 export function AttestationCard(props: { report: AttestationReport | null }) {
   const [openCluster, setOpenCluster] = useState<string | null>(null);
+  const [maximized, setMaximized] = useState(false);
   const report = props.report;
   const age = report ? Math.max(0, Math.round((Date.now() - Date.parse(report.attested_at)) / 1000)) : null;
   return (
@@ -82,6 +83,11 @@ export function AttestationCard(props: { report: AttestationReport | null }) {
       <div className="hd">
         Cluster attestation
         {age !== null && <span className="pill dim">{age < 90 ? `${age}s ago` : `${Math.round(age / 60)}m ago`}</span>}
+        {report && (
+          <button className="icon-btn" onClick={() => setMaximized(true)} title="Open full screen with every check visible">
+            expand ⛶
+          </button>
+        )}
       </div>
       <div className="bd">
         {!report && <div style={{ color: "var(--muted)" }}>Runs before any analysis.</div>}
@@ -115,6 +121,27 @@ export function AttestationCard(props: { report: AttestationReport | null }) {
               export .md
             </button>
           </div>
+        )}
+        {maximized && report && (
+          <Overlay
+            title={<span>Cluster attestation <span className="sub">{report.clusters.length} clusters, every check shown</span></span>}
+            onClose={() => setMaximized(false)}
+          >
+            <div className="report overlay-report">
+              {report.clusters.map((cluster) => (
+                <div key={cluster.cluster}>
+                  <div className="sec">
+                    <span className="sn">{cluster.cluster}</span>
+                    <span className={`pill ${cluster.verdict}`}>{cluster.verdict}</span>
+                  </div>
+                  <DetailedAttestation checks={cluster.checks} />
+                </div>
+              ))}
+              <div className="exports">
+                <button onClick={() => download("attestation.md", attestationMarkdown(report))}>Export .md</button>
+              </div>
+            </div>
+          </Overlay>
         )}
       </div>
     </div>
