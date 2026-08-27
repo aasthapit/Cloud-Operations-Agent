@@ -69,7 +69,13 @@ export function Chat(props: {
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+    // Follow the stream only while the user is already near the bottom;
+    // yanking them back down on every chunk makes reading a tall report
+    // mid-stream impossible.
+    const el = scroller.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (nearBottom) el.scrollTo({ top: el.scrollHeight });
   }, [props.items]);
 
   const send = (text: string) => {
