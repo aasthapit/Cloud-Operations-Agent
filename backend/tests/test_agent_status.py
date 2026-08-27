@@ -4,7 +4,10 @@ Covers gap G6 / FR-CFG-3: a refused battery edit keeps the last known good
 counts AND names the rejected file, so the surface is not just the log.
 """
 
-from cloudops.agent.a2a_app import ConfigStatus
+from starlette.applications import Starlette
+from starlette.testclient import TestClient
+
+from cloudops.agent.a2a_app import ConfigStatus, attach_status_route
 
 ATTESTATION = """
 version: 3
@@ -59,3 +62,17 @@ class TestConfigStatus:
 
         (root / "checks" / "app360.yaml").write_text(APP360)
         assert (await status.payload())["last_error"] is None
+
+
+class TestStatusRoute:
+    def test_appended_route_serves_json(self, tmp_path):
+        """The route is appended to the app to_a2a() built, so the A2A
+        JSON-RPC root keeps its own handler."""
+        app = Starlette()
+        attach_status_route(app, write_config(tmp_path))
+        with TestClient(app) as client:
+            response = client.get("/status")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["batteries"]["attestation"]["checks"] == 2
+        assert body["last_error"] is None
