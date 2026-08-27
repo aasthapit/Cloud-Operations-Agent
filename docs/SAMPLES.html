@@ -1,0 +1,1456 @@
+<!-- Generated from a live capture run; do not hand-edit values. -->
+<title>Cloud Operations Agent Sample Outputs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#F7F5F2; --surface:#FFFFFF; --surface2:#EFECE6; --ink:#20242A; --muted:#5C6167;
+    --line:#E1DDD6; --line-strong:#C7C2B9; --band:#A8232F; --band-deep:#8C1D27; --band-ink:#FFF7F4;
+    --gold:#B7891F; --ok:#1E7A3C; --ok-bg:#E4F0E7; --warn:#96650A; --warn-bg:#F5EBD7; --crit:#B3262E;
+    --crit-bg:#F7E4E4; --info:#1F5FA8; --info-bg:#E3EBF5; --neutral-bg:#ECE9E3; --code-bg:#F0EDE8;
+    --shadow:0 1px 2px rgba(32,36,42,.06),0 4px 14px rgba(32,36,42,.05); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#16181C; --surface:#1E2126;
+    --surface2:#23262C; --ink:#E7E6E2; --muted:#A6AAB0; --line:#2E3238; --line-strong:#41464E; --band:#6F1E27;
+    --band-deep:#5C1820; --band-ink:#F6E9E7; --gold:#CDA04A; --ok:#5CB177; --ok-bg:#1E2C22; --warn:#D2A044;
+    --warn-bg:#2E2818; --crit:#E0606B; --crit-bg:#33201F; --info:#74A8DE; --info-bg:#1C2733;
+    --neutral-bg:#282C32; --code-bg:#14161A; --shadow:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25); } }
+  :root[data-theme="dark"] { --paper:#16181C; --surface:#1E2126; --surface2:#23262C; --ink:#E7E6E2;
+    --muted:#A6AAB0; --line:#2E3238; --line-strong:#41464E; --band:#6F1E27; --band-deep:#5C1820;
+    --band-ink:#F6E9E7; --gold:#CDA04A; --ok:#5CB177; --ok-bg:#1E2C22; --warn:#D2A044; --warn-bg:#2E2818;
+    --crit:#E0606B; --crit-bg:#33201F; --info:#74A8DE; --info-bg:#1C2733; --neutral-bg:#282C32;
+    --code-bg:#14161A; --shadow:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25); }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif; font-size:15.5px; line-height:1.6; }
+  .masthead { background:linear-gradient(180deg,var(--band),var(--band-deep)); color:var(--band-ink);
+    border-bottom:3px solid var(--gold); padding:36px 24px 26px; }
+  .mi { max-width:960px; margin:0 auto; }
+  .eyebrow { font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.14em;
+    text-transform:uppercase; opacity:.85; margin:0 0 8px; }
+  h1 { font-family:"IBM Plex Serif",Georgia,serif; font-size:clamp(26px,4.5vw,38px); margin:0 0 6px; }
+  .sub { max-width:64ch; opacity:.92; margin:0 0 14px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { font-family:"IBM Plex Mono",monospace; font-size:12px; padding:3px 10px;
+    border:1px solid rgba(255,255,255,.35); border-radius:3px; background:rgba(0,0,0,.14); }
+  main { max-width:960px; margin:0 auto; padding:8px 24px 80px; }
+  h2 { font-family:"IBM Plex Serif",Georgia,serif; font-size:24px; margin:46px 0 6px; padding-top:14px;
+    border-top:1px solid var(--line-strong); }
+  h2 .n { color:var(--gold); font-family:"IBM Plex Mono",monospace; font-size:14px; margin-right:9px; }
+  h3 { font-family:"IBM Plex Serif",Georgia,serif; font-size:17px; margin:26px 0 6px; }
+  p { max-width:74ch; margin:8px 0; }
+  .dim-t { color:var(--muted); font-size:12.5px; font-weight:400; font-family:"IBM Plex Sans",sans-serif; }
+  .mono { font-family:"IBM Plex Mono",monospace; font-size:.88em; }
+  .pill { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.05em;
+    text-transform:uppercase; padding:1.5px 8px; border-radius:999px; font-weight:500; white-space:nowrap; }
+  .pill.ok { color:var(--ok); background:var(--ok-bg); } .pill.warn { color:var(--warn); background:var(--warn-bg); }
+  .pill.crit { color:var(--crit); background:var(--crit-bg); } .pill.info { color:var(--info); background:var(--info-bg); }
+  .pill.dim { color:var(--muted); background:var(--neutral-bg); }
+  .tablewrap { overflow-x:auto; margin:12px 0; border:1px solid var(--line-strong); border-radius:5px;
+    background:var(--surface); box-shadow:var(--shadow); }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th { text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+    background:var(--surface2); padding:7px 12px; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+  td { padding:7px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  td.obs { color:var(--muted); font-size:11.5px; max-width:360px; }
+  .evidence { background:var(--code-bg); border:1px solid var(--line); border-radius:5px; padding:10px 14px;
+    margin:10px 0; display:flex; flex-direction:column; gap:3px;
+    font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted); overflow-x:auto; }
+  .evidence .hl { color:var(--ink); }
+  .evidence a { color:var(--band); }
+  .signote { font-size:13px; color:var(--warn); max-width:none; margin:4px 0; }
+  ul.signote { margin:2px 0 0 22px; }
+  .callout { background:var(--surface); border:1px solid var(--line-strong); border-left:3px solid var(--gold);
+    border-radius:5px; padding:12px 16px; margin:16px 0; box-shadow:var(--shadow); }
+  .callout p { max-width:none; }
+  details { margin:12px 0; }
+  summary { cursor:pointer; font-weight:600; font-size:13.5px; }
+  details pre { background:var(--code-bg); border:1px solid var(--line); border-radius:5px;
+    padding:12px; overflow-x:auto; font-size:11px; line-height:1.45; }
+  footer { margin-top:60px; padding-top:14px; border-top:1px solid var(--line-strong);
+    font-size:12.5px; color:var(--muted); }
+</style>
+<header class="masthead"><div class="mi">
+  <p class="eyebrow">Sample outputs &middot; captured from a live run</p>
+  <h1>Cloud Operations Agent Sample Outputs</h1>
+  <p class="sub">The exact typed payloads the deterministic phases emit, captured 2026-08-27 against the live kind fleet in one gateway session. No model was involved in producing any value on this page; the LLM narrates these payloads, it never creates them.</p>
+  <div class="chips"><span class="chip">mode: live</span><span class="chip">fleet: 6 kind clusters</span>
+  <span class="chip">thread: sample-capture</span><span class="chip">batteries: 12 + 24 checks</span></div>
+</div></header>
+<main>
+
+<section><h2><span class="n">1</span>Cluster health attestation</h2>
+<p>The attestation battery ran concurrently against both clusters hosting <span class="mono">payments-api</span>, twelve checks each, in about 0.4 seconds per cluster. Every row is a real reading from the cluster's API server or its in-cluster Prometheus.</p>
+<h3><span class="mono">acm-spoke-1a</span> <span class="pill ok">healthy</span> <span class="dim-t">11/12 checks pass &middot; 410 ms &middot; battery dab3f65</span></h3><div class="tablewrap"><table><thead><tr><th>Check id</th><th>Name</th><th>Observed (live)</th><th>Severity</th><th>Status</th></tr></thead><tbody><tr><td class="mono">api-reachability</td><td>API reachability</td><td class="mono obs">5.5</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">cluster-version</td><td>ClusterVersion</td><td class="mono obs">v1.33.7</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">cluster-operators</td><td>ClusterOperators</td><td class="mono obs">0/0</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">nodes</td><td>Nodes</td><td class="mono obs">1/1</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">machine-config-pools</td><td>MachineConfigPools</td><td class="mono obs">not applicable: vanilla Kubernetes cluster (no OpenShift APIs)</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">etcd</td><td>etcd</td><td class="mono obs">1/1</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">firing-alerts</td><td>Firing alerts</td><td class="mono obs">0 critical, 0 warning firing</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">watchdog-present</td><td>Watchdog present</td><td class="mono obs">True</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">apiserver-slo</td><td>API server SLO</td><td class="mono obs">0.0</td><td>warning</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">capacity</td><td>Capacity headroom</td><td class="mono obs">cpu req 12%, mem req 3% of allocatable across 1 node(s); single-node cluster, so the mi...</td><td>warning</td><td><span class="pill warn">warn</span></td></tr><tr><td class="mono">pending-csrs</td><td>Pending CSRs</td><td class="mono obs">0</td><td>warning</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">cert-expiry</td><td>Certificate expiry signals</td><td class="mono obs">[]</td><td>warning</td><td><span class="pill ok">pass</span></td></tr></tbody></table></div><p class="signote">Signals: </p><ul class="signote"><li>capacity: resource requests no longer fit allocatable capacity minus one node (overcommit guard) [observed: false]</li></ul>
+<h3><span class="mono">acm-spoke-2a</span> <span class="pill ok">healthy</span> <span class="dim-t">11/12 checks pass &middot; 411 ms &middot; battery dab3f65</span></h3><div class="tablewrap"><table><thead><tr><th>Check id</th><th>Name</th><th>Observed (live)</th><th>Severity</th><th>Status</th></tr></thead><tbody><tr><td class="mono">api-reachability</td><td>API reachability</td><td class="mono obs">5.1</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">cluster-version</td><td>ClusterVersion</td><td class="mono obs">v1.33.7</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">cluster-operators</td><td>ClusterOperators</td><td class="mono obs">0/0</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">nodes</td><td>Nodes</td><td class="mono obs">1/1</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">machine-config-pools</td><td>MachineConfigPools</td><td class="mono obs">not applicable: vanilla Kubernetes cluster (no OpenShift APIs)</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">etcd</td><td>etcd</td><td class="mono obs">1/1</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">firing-alerts</td><td>Firing alerts</td><td class="mono obs">0 critical, 0 warning firing</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">watchdog-present</td><td>Watchdog present</td><td class="mono obs">True</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">apiserver-slo</td><td>API server SLO</td><td class="mono obs">0.0</td><td>warning</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">capacity</td><td>Capacity headroom</td><td class="mono obs">cpu req 12%, mem req 3% of allocatable across 1 node(s); single-node cluster, so the mi...</td><td>warning</td><td><span class="pill warn">warn</span></td></tr><tr><td class="mono">pending-csrs</td><td>Pending CSRs</td><td class="mono obs">0</td><td>warning</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">cert-expiry</td><td>Certificate expiry signals</td><td class="mono obs">[]</td><td>warning</td><td><span class="pill ok">pass</span></td></tr></tbody></table></div><p class="signote">Signals: </p><ul class="signote"><li>capacity: resource requests no longer fit allocatable capacity minus one node (overcommit guard) [observed: false]</li></ul>
+<div class="callout"><p><strong>Talking point - honest verdicts on vanilla Kubernetes.</strong> These kind clusters have no OpenShift control plane, so OpenShift-only checks (MachineConfigPools, ClusterOperators) report <em>not applicable</em> with health-neutral values instead of falsely degrading the cluster. The capacity warning is also honest: a single-node cluster cannot survive losing its node, and warnings do not flip the verdict.</p></div>
+<h3>Evidence trail: the one warning</h3>
+<div class="evidence"><span class="hl">check capacity &middot; tool obs__get_capacity_summary &middot; 20:11:02 UTC</span><span>args: {&quot;cluster&quot;: &quot;acm-spoke-2a&quot;}</span><span>observed: cpu req 12%, mem req 3% of allocatable across 1 node(s); single-node cluster, so the minus-one-node guard cannot pass</span><span>rule: fits_minus_one_node falsy -&gt; observed false -&gt; warn: resource requests no longer fit allocatable capacity minus one node (overcommit guard)</span><span>runbook: <a href="https://monitoring.mixins.dev/kubernetes/#kubecpuovercommit">#kubecpuovercommit</a></span></div>
+<h3>Evidence trail: an n/a check on vanilla Kubernetes</h3>
+<div class="evidence"><span class="hl">check machine-config-pools &middot; tool ocp__get_machine_config_pools &middot; 20:11:02 UTC</span><span>args: {&quot;cluster&quot;: &quot;acm-spoke-2a&quot;}</span><span>observed: not applicable: vanilla Kubernetes cluster (no OpenShift APIs)</span><span>no rules triggered (clean pass)</span><span>runbook: <a href="https://access.redhat.com/solutions/5244121">5244121</a></span></div>
+</section>
+
+<section><h2><span class="n">2</span>Application 360 report</h2>
+<p><span class="mono">payments-api</span> in <span class="mono">payments-prod</span> @ <span class="mono">acm-spoke-2a</span> (nonprod) &middot; overall <span class="pill crit">critical</span> &middot; battery dab3f65 &middot; 2026-08-27</p>
+<p>All 18 sections of the organization's report template, each populated by deterministic checks, registry facts, or labeled manual items:</p>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>Section</th><th>Source</th><th>Headline observation</th><th>Status</th></tr></thead><tbody><tr><td>1</td><td>Executive summary</td><td>narrative</td><td class="mono obs"></td><td><span class="pill info">info</span></td></tr><tr><td>2</td><td>Application identity</td><td>registry</td><td class="mono obs">application: payments-api</td><td><span class="pill dim">registry</span></td></tr><tr><td>3</td><td>Deployment overview</td><td>checks</td><td class="mono obs">0/2 ready</td><td><span class="pill crit">fail</span></td></tr><tr><td>4</td><td>Runtime health</td><td>checks</td><td class="mono obs">[&quot;payments-api-85b5475d9c-4q9qt&quot;, &quot;payments-api-85b5475d9c-v6ksh&quot;]</td><td><span class="pill crit">fail</span></td></tr><tr><td>5</td><td>Configuration</td><td>checks</td><td class="mono obs">0 ConfigMaps, 0 Secrets (names only), 0 mounted volume(s)</td><td><span class="pill info">info</span></td></tr><tr><td>6</td><td>Networking and connectivity</td><td>checks</td><td class="mono obs">1 Ingress rule(s); cert expiry not observable in this cluster</td><td><span class="pill ok">pass</span></td></tr><tr><td>7</td><td>Storage and data</td><td>checks</td><td class="mono obs">no persistent volumes</td><td><span class="pill ok">pass</span></td></tr><tr><td>8</td><td>Security posture</td><td>checks</td><td class="mono obs">sa default, pod-security enforce=cluster default, externally reachable</td><td><span class="pill info">info</span></td></tr><tr><td>9</td><td>Observability</td><td>checks</td><td class="mono obs">0 critical, 0 warning firing</td><td><span class="pill ok">pass</span></td></tr><tr><td>10</td><td>Dependency health</td><td>registry</td><td class="mono obs">dependencies: [{&#x27;name&#x27;: &#x27;payments-db&#x27;, &#x27;type&#x27;: &#x27;database&#x27;}, {&#x27;name&#x27;: &#x27;</td><td><span class="pill dim">registry</span></td></tr><tr><td>11</td><td>Cluster and platform context</td><td>attestation</td><td class="mono obs">healthy</td><td><span class="pill ok">pass</span></td></tr><tr><td>12</td><td>Capacity and performance</td><td>checks</td><td class="mono obs">p95 1Mi of 256Mi limit</td><td><span class="pill ok">pass</span></td></tr><tr><td>13</td><td>Release and change history</td><td>checks</td><td class="mono obs">rev 1 (1.36) deployed 4h ago</td><td><span class="pill warn">warn</span></td></tr><tr><td>14</td><td>Reliability and recovery</td><td>checks</td><td class="mono obs">no PodDisruptionBudget</td><td><span class="pill ok">pass</span></td></tr><tr><td>15</td><td>Operational risks and gaps</td><td>narrative</td><td class="mono obs"></td><td><span class="pill info">info</span></td></tr><tr><td>16</td><td>Supportability and ownership</td><td>registry</td><td class="mono obs">owners.support_team: payments-eng on-call</td><td><span class="pill dim">registry</span></td></tr><tr><td>17</td><td>Recommendations</td><td>narrative</td><td class="mono obs"></td><td><span class="pill info">info</span></td></tr><tr><td>18</td><td>Final assessment</td><td>narrative</td><td class="mono obs"></td><td><span class="pill info">info</span></td></tr></tbody></table></div>
+<div class="callout"><p><strong>Talking point - the triage fork in one screen.</strong> The cluster above attests <em>healthy</em> while the application is <em>critical</em>: the platform is exonerated with evidence, and the incident is correctly attributed to the workload (a crash-looping container), not to the fleet.</p></div>
+<h3>Zoom: section 3 &middot; Deployment overview <span class="pill crit">fail</span></h3>
+<div class="tablewrap"><table><thead><tr><th>Check id</th><th>Name</th><th>Observed (live)</th><th>Severity</th><th>Status</th></tr></thead><tbody><tr><td class="mono">workload-availability</td><td>Workload availability</td><td class="mono obs">0/2 ready</td><td>critical</td><td><span class="pill crit">fail</span></td></tr><tr><td class="mono">rollout-status</td><td>Rollout status</td><td class="mono obs">no rollout in progress</td><td>warning</td><td><span class="pill crit">fail</span></td></tr></tbody></table></div>
+<h3>Zoom: section 4 &middot; Runtime health <span class="pill crit">fail</span></h3>
+<div class="tablewrap"><table><thead><tr><th>Check id</th><th>Name</th><th>Observed (live)</th><th>Severity</th><th>Status</th></tr></thead><tbody><tr><td class="mono">crashloops</td><td>CrashLoopBackOff pods</td><td class="mono obs">[&quot;payments-api-85b5475d9c-4q9qt&quot;, &quot;payments-api-85b5475d9c-v6ksh&quot;]</td><td>critical</td><td><span class="pill crit">fail</span></td></tr><tr><td class="mono">image-pull-errors</td><td>Image pull errors</td><td class="mono obs">[]</td><td>critical</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">pod-restarts</td><td>Restart churn</td><td class="mono obs">90</td><td>critical</td><td><span class="pill crit">fail</span></td></tr><tr><td class="mono">oomkills</td><td>OOM kills</td><td class="mono obs">[]</td><td>warning</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">pending-pods</td><td>Pending pods</td><td class="mono obs">[]</td><td>warning</td><td><span class="pill ok">pass</span></td></tr><tr><td class="mono">probe-failures</td><td>Probe failures</td><td class="mono obs">[]</td><td>warning</td><td><span class="pill ok">pass</span></td></tr></tbody></table></div>
+<h3>Evidence trail: the crashloop finding</h3>
+<div class="evidence"><span class="hl">check crashloops &middot; tool ocp__get_workloads &middot; 20:11:02 UTC</span><span>args: {&quot;cluster&quot;: &quot;acm-spoke-2a&quot;, &quot;namespace&quot;: &quot;payments-prod&quot;, &quot;app_label&quot;: &quot;payments-api&quot;}</span><span>observed: [&quot;payments-api-85b5475d9c-4q9qt&quot;, &quot;payments-api-85b5475d9c-v6ksh&quot;]</span><span>rule: pods.crashloop not_empty -&gt; observed [&quot;payments-api-85b5475d9c-4q9qt&quot;, &quot;payments-api-85b5475d9c-v6ksh&quot;] -&gt; fail: pods stuck in CrashLoopBackOff</span><span>runbook: <a href="https://monitoring.mixins.dev/kubernetes/#kubepodcrashlooping">#kubepodcrashlooping</a></span></div>
+<h3>Registry-sourced facts (section 2 &middot; Application identity)</h3>
+<div class="tablewrap"><table><tbody><tr><td class="mono">application</td><td>payments-api</td><td><span class="pill dim">registry</span></td></tr><tr><td class="mono">owners.business</td><td>payments product team</td><td><span class="pill dim">registry</span></td></tr><tr><td class="mono">owners.technical</td><td>payments-eng</td><td><span class="pill dim">registry</span></td></tr><tr><td class="mono">owners.support_team</td><td>payments-eng on-call</td><td><span class="pill dim">registry</span></td></tr><tr><td class="mono">criticality</td><td>high</td><td><span class="pill dim">registry</span></td></tr><tr><td class="mono">sla</td><td>99.9% monthly</td><td><span class="pill dim">registry</span></td></tr><tr><td class="mono">slo</td><td>p95 latency &lt; 400ms, error rate &lt; 1%</td><td><span class="pill dim">registry</span></td></tr></tbody></table></div>
+<p>Items the batteries cannot yet automate render labeled <span class="pill dim">manual</span> rather than silently vanishing (FR-360-6); from section 5, Configuration:</p><div class="tablewrap"><table><tbody><tr><td colspan="2">Check for config drift across environments</td><td><span class="pill dim">manual</span></td></tr><tr><td colspan="2">Validate secret rotation status</td><td><span class="pill dim">manual</span></td></tr></tbody></table></div>
+</section>
+
+<section><h2><span class="n">3</span>How to read these in a demo</h2>
+<p>Five talking points this capture supports:</p>
+<ul>
+<li><strong>Deterministic first:</strong> every value above came from a versioned check battery (config, not code) executed before any model ran; the narrative can only cite what exists here.</li>
+<li><strong>Platform or app:</strong> healthy attestation + critical report answers the first triage question with evidence, in under a second of checks.</li>
+<li><strong>Auditable healthy:</strong> even passing checks carry their tool, args, timestamp, and runbook; a green verdict can be defended row by row.</li>
+<li><strong>Vanilla and OpenShift:</strong> the same battery runs on both; what does not apply says so instead of lying in either direction.</li>
+<li><strong>Nothing hidden:</strong> report items automation cannot reach yet render as labeled manual rows, so the 18-section template stays complete.</li>
+</ul>
+</section>
+
+<section><h2><span class="n">4</span>Raw payloads</h2>
+<p>The complete JSON exactly as the agent emits it over A2A (typed fences), for anyone who wants to inspect the contract.</p>
+<details><summary>attestation payload &middot; 2 clusters (11 KB)</summary><pre>[
+ {
+  &quot;cluster&quot;: &quot;acm-spoke-1a&quot;,
+  &quot;verdict&quot;: &quot;healthy&quot;,
+  &quot;signals&quot;: [
+   &quot;capacity: resource requests no longer fit allocatable capacity minus one node (overcommit guard) [observed: false]&quot;
+  ],
+  &quot;checks&quot;: [
+   {
+    &quot;id&quot;: &quot;api-reachability&quot;,
+    &quot;name&quot;: &quot;API reachability&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;5.5&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 197.51733301382046,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_cluster_info&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.639521+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: null,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;cluster-version&quot;,
+    &quot;name&quot;: &quot;ClusterVersion&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;v1.33.7&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 265.4004999931203,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_cluster_version&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.639997+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/updating_clusters/performing-a-cluster-update&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;cluster-operators&quot;,
+    &quot;name&quot;: &quot;ClusterOperators&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0/0&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 201.22887499746867,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_cluster_operators&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640020+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://github.com/openshift/enhancements/blob/master/dev-guide/cluster-version-operator/dev/clusteroperator.md&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;nodes&quot;,
+    &quot;name&quot;: &quot;Nodes&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;1/1&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 267.29454200540204,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_nodes&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640040+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;machine-config-pools&quot;,
+    &quot;name&quot;: &quot;MachineConfigPools&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;not applicable: vanilla Kubernetes cluster (no OpenShift APIs)&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 206.28195800236426,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_machine_config_pools&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640053+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://access.redhat.com/solutions/5244121&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;etcd&quot;,
+    &quot;name&quot;: &quot;etcd&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;1/1&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 220.43637500610203,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_etcd_health&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640064+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://github.com/openshift/runbooks/blob/master/alerts/cluster-etcd-operator/etcdNoLeader.md&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;firing-alerts&quot;,
+    &quot;name&quot;: &quot;Firing alerts&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0 critical, 0 warning firing&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 198.88437500048894,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640077+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://runbooks.prometheus-operator.dev/&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;watchdog-present&quot;,
+    &quot;name&quot;: &quot;Watchdog present&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;True&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 198.88437500048894,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640090+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;apiserver-slo&quot;,
+    &quot;name&quot;: &quot;API server SLO&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0.0&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 408.5522090026643,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_apiserver_slo&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640101+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/KubeAPIErrorBudgetBurn.md&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;capacity&quot;,
+    &quot;name&quot;: &quot;Capacity headroom&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;warn&quot;,
+    &quot;observed&quot;: &quot;cpu req 12%, mem req 3% of allocatable across 1 node(s); single-node cluster, so the minus-one-node guard cannot pass&quot;,
+    &quot;reason&quot;: &quot;resource requests no longer fit allocatable capacity minus one node (overcommit guard)&quot;,
+    &quot;duration_ms&quot;: 214.67204199871048,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_capacity_summary&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640113+00:00&quot;,
+     &quot;triggered_rules&quot;: [
+      {
+       &quot;path&quot;: &quot;fits_minus_one_node&quot;,
+       &quot;op&quot;: &quot;falsy&quot;,
+       &quot;value&quot;: null,
+       &quot;observed&quot;: false,
+       &quot;outcome&quot;: &quot;warn&quot;,
+       &quot;reason&quot;: &quot;resource requests no longer fit allocatable capacity minus one node (overcommit guard)&quot;
+      }
+     ],
+     &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubecpuovercommit&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;pending-csrs&quot;,
+    &quot;name&quot;: &quot;Pending CSRs&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 270.03258299373556,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_pending_csrs&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640138+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://access.redhat.com/solutions/5044281&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;cert-expiry&quot;,
+    &quot;name&quot;: &quot;Certificate expiry signals&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;[]&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 198.88437500048894,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-1a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.640150+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeclientcertificateexpiration/&quot;,
+     &quot;error&quot;: null
+    }
+   }
+  ],
+  &quot;battery_version&quot;: &quot;dab3f65&quot;,
+  &quot;attested_at&quot;: &quot;2026-08-27T20:11:02.640396+00:00&quot;,
+  &quot;duration_ms&quot;: 410.2
+ },
+ {
+  &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+  &quot;verdict&quot;: &quot;healthy&quot;,
+  &quot;signals&quot;: [
+   &quot;capacity: resource requests no longer fit allocatable capacity minus one node (overcommit guard) [observed: false]&quot;
+  ],
+  &quot;checks&quot;: [
+   {
+    &quot;id&quot;: &quot;api-reachability&quot;,
+    &quot;name&quot;: &quot;API reachability&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;5.1&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 266.18229200539645,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_cluster_info&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641186+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: null,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;cluster-version&quot;,
+    &quot;name&quot;: &quot;ClusterVersion&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;v1.33.7&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 268.0974579998292,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_cluster_version&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641209+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/updating_clusters/performing-a-cluster-update&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;cluster-operators&quot;,
+    &quot;name&quot;: &quot;ClusterOperators&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0/0&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 269.15949999238364,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_cluster_operators&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641221+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://github.com/openshift/enhancements/blob/master/dev-guide/cluster-version-operator/dev/clusteroperator.md&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;nodes&quot;,
+    &quot;name&quot;: &quot;Nodes&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;1/1&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 271.57191700825933,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_nodes&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641233+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;machine-config-pools&quot;,
+    &quot;name&quot;: &quot;MachineConfigPools&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;not applicable: vanilla Kubernetes cluster (no OpenShift APIs)&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 270.7757909956854,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_machine_config_pools&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641243+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://access.redhat.com/solutions/5244121&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;etcd&quot;,
+    &quot;name&quot;: &quot;etcd&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;1/1&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 406.1455829942133,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_etcd_health&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641253+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://github.com/openshift/runbooks/blob/master/alerts/cluster-etcd-operator/etcdNoLeader.md&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;firing-alerts&quot;,
+    &quot;name&quot;: &quot;Firing alerts&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0 critical, 0 warning firing&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 406.9905419892166,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641264+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://runbooks.prometheus-operator.dev/&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;watchdog-present&quot;,
+    &quot;name&quot;: &quot;Watchdog present&quot;,
+    &quot;severity&quot;: &quot;critical&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;True&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 406.9905419892166,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641273+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;apiserver-slo&quot;,
+    &quot;name&quot;: &quot;API server SLO&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0.0&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 410.2010839997092,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_apiserver_slo&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641286+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/KubeAPIErrorBudgetBurn.md&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;capacity&quot;,
+    &quot;name&quot;: &quot;Capacity headroom&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;warn&quot;,
+    &quot;observed&quot;: &quot;cpu req 12%, mem req 3% of allocatable across 1 node(s); single-node cluster, so the minus-one-node guard cannot pass&quot;,
+    &quot;reason&quot;: &quot;resource requests no longer fit allocatable capacity minus one node (overcommit guard)&quot;,
+    &quot;duration_ms&quot;: 407.878541998798,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_capacity_summary&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641296+00:00&quot;,
+     &quot;triggered_rules&quot;: [
+      {
+       &quot;path&quot;: &quot;fits_minus_one_node&quot;,
+       &quot;op&quot;: &quot;falsy&quot;,
+       &quot;value&quot;: null,
+       &quot;observed&quot;: false,
+       &quot;outcome&quot;: &quot;warn&quot;,
+       &quot;reason&quot;: &quot;resource requests no longer fit allocatable capacity minus one node (overcommit guard)&quot;
+      }
+     ],
+     &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubecpuovercommit&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;pending-csrs&quot;,
+    &quot;name&quot;: &quot;Pending CSRs&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;0&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 272.22287499171216,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;ocp__get_pending_csrs&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641314+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://access.redhat.com/solutions/5044281&quot;,
+     &quot;error&quot;: null
+    }
+   },
+   {
+    &quot;id&quot;: &quot;cert-expiry&quot;,
+    &quot;name&quot;: &quot;Certificate expiry signals&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;status&quot;: &quot;pass&quot;,
+    &quot;observed&quot;: &quot;[]&quot;,
+    &quot;reason&quot;: &quot;&quot;,
+    &quot;duration_ms&quot;: 406.9905419892166,
+    &quot;evidence&quot;: {
+     &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+     &quot;args&quot;: {
+      &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+     },
+     &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641323+00:00&quot;,
+     &quot;triggered_rules&quot;: [],
+     &quot;runbook&quot;: &quot;https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeclientcertificateexpiration/&quot;,
+     &quot;error&quot;: null
+    }
+   }
+  ],
+  &quot;battery_version&quot;: &quot;dab3f65&quot;,
+  &quot;attested_at&quot;: &quot;2026-08-27T20:11:02.641421+00:00&quot;,
+  &quot;duration_ms&quot;: 411.2
+ }
+]</pre></details>
+<details><summary>Application 360 payload &middot; 18 sections (16 KB)</summary><pre>{
+ &quot;kind&quot;: &quot;app360&quot;,
+ &quot;application&quot;: &quot;payments-api&quot;,
+ &quot;app_label&quot;: &quot;payments-api&quot;,
+ &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+ &quot;namespace&quot;: &quot;payments-prod&quot;,
+ &quot;environment&quot;: &quot;nonprod&quot;,
+ &quot;overall_status&quot;: &quot;critical&quot;,
+ &quot;sections&quot;: [
+  {
+   &quot;section&quot;: 1,
+   &quot;title&quot;: &quot;Executive summary&quot;,
+   &quot;source&quot;: &quot;narrative&quot;,
+   &quot;status&quot;: &quot;info&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 2,
+   &quot;title&quot;: &quot;Application identity&quot;,
+   &quot;source&quot;: &quot;registry&quot;,
+   &quot;status&quot;: &quot;registry&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {
+    &quot;application&quot;: &quot;payments-api&quot;,
+    &quot;owners.business&quot;: &quot;payments product team&quot;,
+    &quot;owners.technical&quot;: &quot;payments-eng&quot;,
+    &quot;owners.support_team&quot;: &quot;payments-eng on-call&quot;,
+    &quot;criticality&quot;: &quot;high&quot;,
+    &quot;sla&quot;: &quot;99.9% monthly&quot;,
+    &quot;slo&quot;: &quot;p95 latency &lt; 400ms, error rate &lt; 1%&quot;
+   },
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 3,
+   &quot;title&quot;: &quot;Deployment overview&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;fail&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;workload-availability&quot;,
+     &quot;name&quot;: &quot;Workload availability&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;fail&quot;,
+     &quot;observed&quot;: &quot;0/2 ready&quot;,
+     &quot;reason&quot;: &quot;ready replicas below desired outside of an in-progress rollout&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926135+00:00&quot;,
+      &quot;triggered_rules&quot;: [
+       {
+        &quot;path&quot;: &quot;replicas_mismatch&quot;,
+        &quot;op&quot;: &quot;not_empty&quot;,
+        &quot;value&quot;: null,
+        &quot;observed&quot;: [
+         &quot;payments-api&quot;
+        ],
+        &quot;outcome&quot;: &quot;fail&quot;,
+        &quot;reason&quot;: &quot;ready replicas below desired outside of an in-progress rollout&quot;
+       }
+      ],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubedeploymentreplicasmismatch&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;rollout-status&quot;,
+     &quot;name&quot;: &quot;Rollout status&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;fail&quot;,
+     &quot;observed&quot;: &quot;no rollout in progress&quot;,
+     &quot;reason&quot;: &quot;a rollout has failed revisions&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926169+00:00&quot;,
+      &quot;triggered_rules&quot;: [
+       {
+        &quot;path&quot;: &quot;failed_rollouts&quot;,
+        &quot;op&quot;: &quot;not_empty&quot;,
+        &quot;value&quot;: null,
+        &quot;observed&quot;: [
+         &quot;payments-api&quot;
+        ],
+        &quot;outcome&quot;: &quot;fail&quot;,
+        &quot;reason&quot;: &quot;a rollout has failed revisions&quot;
+       }
+      ],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 4,
+   &quot;title&quot;: &quot;Runtime health&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;fail&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;crashloops&quot;,
+     &quot;name&quot;: &quot;CrashLoopBackOff pods&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;fail&quot;,
+     &quot;observed&quot;: &quot;[\&quot;payments-api-85b5475d9c-4q9qt\&quot;, \&quot;payments-api-85b5475d9c-v6ksh\&quot;]&quot;,
+     &quot;reason&quot;: &quot;pods stuck in CrashLoopBackOff&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926193+00:00&quot;,
+      &quot;triggered_rules&quot;: [
+       {
+        &quot;path&quot;: &quot;pods.crashloop&quot;,
+        &quot;op&quot;: &quot;not_empty&quot;,
+        &quot;value&quot;: null,
+        &quot;observed&quot;: [
+         &quot;payments-api-85b5475d9c-4q9qt&quot;,
+         &quot;payments-api-85b5475d9c-v6ksh&quot;
+        ],
+        &quot;outcome&quot;: &quot;fail&quot;,
+        &quot;reason&quot;: &quot;pods stuck in CrashLoopBackOff&quot;
+       }
+      ],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubepodcrashlooping&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;image-pull-errors&quot;,
+     &quot;name&quot;: &quot;Image pull errors&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;[]&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926214+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubecontainerwaiting&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;pod-restarts&quot;,
+     &quot;name&quot;: &quot;Restart churn&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;fail&quot;,
+     &quot;observed&quot;: &quot;90&quot;,
+     &quot;reason&quot;: &quot;more than 3 container restarts in the last hour&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926227+00:00&quot;,
+      &quot;triggered_rules&quot;: [
+       {
+        &quot;path&quot;: &quot;pods.restarts_last_hour&quot;,
+        &quot;op&quot;: &quot;gt&quot;,
+        &quot;value&quot;: 3,
+        &quot;observed&quot;: 90,
+        &quot;outcome&quot;: &quot;fail&quot;,
+        &quot;reason&quot;: &quot;more than 3 container restarts in the last hour&quot;
+       }
+      ],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubepodcrashlooping&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;oomkills&quot;,
+     &quot;name&quot;: &quot;OOM kills&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;[]&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926241+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;pending-pods&quot;,
+     &quot;name&quot;: &quot;Pending pods&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;[]&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926254+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubepodnotready&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;probe-failures&quot;,
+     &quot;name&quot;: &quot;Probe failures&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;[]&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926266+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 5,
+   &quot;title&quot;: &quot;Configuration&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;info&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;config-references&quot;,
+     &quot;name&quot;: &quot;Config references&quot;,
+     &quot;severity&quot;: &quot;info&quot;,
+     &quot;status&quot;: &quot;info&quot;,
+     &quot;observed&quot;: &quot;0 ConfigMaps, 0 Secrets (names only), 0 mounted volume(s)&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 143.5465410031611,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_configuration&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926281+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [
+    &quot;Check for config drift across environments&quot;,
+    &quot;Validate secret rotation status&quot;
+   ],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 6,
+   &quot;title&quot;: &quot;Networking and connectivity&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;pass&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;route-tls&quot;,
+     &quot;name&quot;: &quot;Route TLS certificates&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;1 Ingress rule(s); cert expiry not observable in this cluster&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 104.5758330001263,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_network&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926296+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;dns-connectivity&quot;,
+     &quot;name&quot;: &quot;DNS and connectivity&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;True&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 104.5758330001263,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_network&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926304+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [
+    &quot;Validate external endpoint connectivity&quot;,
+    &quot;Check firewall or egress restrictions&quot;
+   ],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 7,
+   &quot;title&quot;: &quot;Storage and data&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;pass&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;pvc-binding&quot;,
+     &quot;name&quot;: &quot;PVC binding&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;no persistent volumes&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 142.66908299759962,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_pvcs&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926319+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;pvc-capacity&quot;,
+     &quot;name&quot;: &quot;PVC capacity&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;no persistent volumes&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 142.66908299759962,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_pvcs&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926327+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubepersistentvolumefillingup&quot;,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {
+    &quot;backup.policy&quot;: &quot;nightly snapshot of payments-db&quot;
+   },
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 8,
+   &quot;title&quot;: &quot;Security posture&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;info&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;workload-identity&quot;,
+     &quot;name&quot;: &quot;ServiceAccount and pod security&quot;,
+     &quot;severity&quot;: &quot;info&quot;,
+     &quot;status&quot;: &quot;info&quot;,
+     &quot;observed&quot;: &quot;sa default, pod-security enforce=cluster default, externally reachable&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 140.85783300106414,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_security_posture&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926341+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [
+    &quot;Review image vulnerability status&quot;,
+    &quot;Review least-privilege access posture&quot;
+   ],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 9,
+   &quot;title&quot;: &quot;Observability&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;pass&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;app-alerts&quot;,
+     &quot;name&quot;: &quot;Firing application alerts&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;0 critical, 0 warning firing&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 263.3788329985691,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_firing_alerts&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926357+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;error-rate&quot;,
+     &quot;name&quot;: &quot;Error rate&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 261.8937920051394,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_golden_signals&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926368+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;latency&quot;,
+     &quot;name&quot;: &quot;Latency p95&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 261.8937920051394,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_golden_signals&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926378+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 10,
+   &quot;title&quot;: &quot;Dependency health&quot;,
+   &quot;source&quot;: &quot;registry&quot;,
+   &quot;status&quot;: &quot;registry&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {
+    &quot;dependencies&quot;: [
+     {
+      &quot;name&quot;: &quot;payments-db&quot;,
+      &quot;type&quot;: &quot;database&quot;
+     },
+     {
+      &quot;name&quot;: &quot;ledger-kafka&quot;,
+      &quot;type&quot;: &quot;message_queue&quot;
+     },
+     {
+      &quot;name&quot;: &quot;fraud-scoring-api&quot;,
+      &quot;type&quot;: &quot;internal_service&quot;
+     }
+    ]
+   },
+   &quot;manual_items&quot;: [
+    &quot;Review message queue depth and third-party API health&quot;
+   ],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 11,
+   &quot;title&quot;: &quot;Cluster and platform context&quot;,
+   &quot;source&quot;: &quot;attestation&quot;,
+   &quot;status&quot;: &quot;pass&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;host-cluster-attestation&quot;,
+     &quot;name&quot;: &quot;Host cluster acm-spoke-2a&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;healthy&quot;,
+     &quot;reason&quot;: &quot;capacity: resource requests no longer fit allocatable capacity minus one node (overcommit guard) [observed: false]&quot;,
+     &quot;duration_ms&quot;: 0.0,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;attestation&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.641421+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;namespace-quota&quot;,
+     &quot;name&quot;: &quot;Namespace quota&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;no ResourceQuota in this namespace&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 143.96083400060888,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_quotas&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926394+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubequotaalmostfull&quot;,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 12,
+   &quot;title&quot;: &quot;Capacity and performance&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;pass&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;memory-headroom&quot;,
+     &quot;name&quot;: &quot;Memory headroom&quot;,
+     &quot;severity&quot;: &quot;critical&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;p95 1Mi of 256Mi limit&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 262.803208999685,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_workload_usage&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926422+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;cpu-throttling&quot;,
+     &quot;name&quot;: &quot;CPU throttling&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 262.803208999685,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_workload_usage&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926433+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#cputhrottlinghigh&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;hpa-maxed&quot;,
+     &quot;name&quot;: &quot;HPA at max replicas&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;no HPA&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 262.803208999685,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_workload_usage&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926441+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubehpamaxedout&quot;,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 13,
+   &quot;title&quot;: &quot;Release and change history&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;warn&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;release-history&quot;,
+     &quot;name&quot;: &quot;Recent rollouts&quot;,
+     &quot;severity&quot;: &quot;info&quot;,
+     &quot;status&quot;: &quot;warn&quot;,
+     &quot;observed&quot;: &quot;rev 1 (1.36) deployed 4h ago&quot;,
+     &quot;reason&quot;: &quot;failed revisions in recent rollout history&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926459+00:00&quot;,
+      &quot;triggered_rules&quot;: [
+       {
+        &quot;path&quot;: &quot;failed_rollouts&quot;,
+        &quot;op&quot;: &quot;not_empty&quot;,
+        &quot;value&quot;: null,
+        &quot;observed&quot;: [
+         &quot;payments-api&quot;
+        ],
+        &quot;outcome&quot;: &quot;warn&quot;,
+        &quot;reason&quot;: &quot;failed revisions in recent rollout history&quot;
+       }
+      ],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [
+    &quot;Review change tickets and deployment approvals&quot;
+   ],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 14,
+   &quot;title&quot;: &quot;Reliability and recovery&quot;,
+   &quot;source&quot;: &quot;checks&quot;,
+   &quot;status&quot;: &quot;pass&quot;,
+   &quot;checks&quot;: [
+    {
+     &quot;id&quot;: &quot;pdb-disruptions&quot;,
+     &quot;name&quot;: &quot;PDB disruption budget&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;no PodDisruptionBudget&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 262.803208999685,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;obs__get_workload_usage&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926473+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: &quot;https://monitoring.mixins.dev/kubernetes/#kubepdbnotenoughhealthypods&quot;,
+      &quot;error&quot;: null
+     }
+    },
+    {
+     &quot;id&quot;: &quot;single-replica&quot;,
+     &quot;name&quot;: &quot;Single points of failure&quot;,
+     &quot;severity&quot;: &quot;warning&quot;,
+     &quot;status&quot;: &quot;pass&quot;,
+     &quot;observed&quot;: &quot;0/2 ready&quot;,
+     &quot;reason&quot;: &quot;&quot;,
+     &quot;duration_ms&quot;: 103.65958399779629,
+     &quot;evidence&quot;: {
+      &quot;tool&quot;: &quot;ocp__get_workloads&quot;,
+      &quot;args&quot;: {
+       &quot;cluster&quot;: &quot;acm-spoke-2a&quot;,
+       &quot;namespace&quot;: &quot;payments-prod&quot;,
+       &quot;app_label&quot;: &quot;payments-api&quot;
+      },
+      &quot;timestamp&quot;: &quot;2026-08-27T20:11:02.926482+00:00&quot;,
+      &quot;triggered_rules&quot;: [],
+      &quot;runbook&quot;: null,
+      &quot;error&quot;: null
+     }
+    }
+   ],
+   &quot;registry_facts&quot;: {
+    &quot;backup.rpo&quot;: &quot;24h&quot;,
+    &quot;backup.rto&quot;: &quot;4h&quot;,
+    &quot;backup.policy&quot;: &quot;nightly snapshot of payments-db&quot;
+   },
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 15,
+   &quot;title&quot;: &quot;Operational risks and gaps&quot;,
+   &quot;source&quot;: &quot;narrative&quot;,
+   &quot;status&quot;: &quot;info&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [
+    &quot;List deprecated versions and unsupported components&quot;,
+    &quot;List manual operational steps and missing documentation&quot;
+   ],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 16,
+   &quot;title&quot;: &quot;Supportability and ownership&quot;,
+   &quot;source&quot;: &quot;registry&quot;,
+   &quot;status&quot;: &quot;registry&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {
+    &quot;owners.support_team&quot;: &quot;payments-eng on-call&quot;,
+    &quot;on_call&quot;: &quot;payments-eng-oncall&quot;,
+    &quot;escalation&quot;: &quot;payments-eng-oncall -&gt; platform-sre -&gt; incident commander&quot;,
+    &quot;runbook_url&quot;: &quot;https://runbooks.example.internal/payments-api&quot;,
+    &quot;monitoring_owner&quot;: &quot;payments-eng&quot;,
+    &quot;docs_status&quot;: &quot;complete&quot;
+   },
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 17,
+   &quot;title&quot;: &quot;Recommendations&quot;,
+   &quot;source&quot;: &quot;narrative&quot;,
+   &quot;status&quot;: &quot;info&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  },
+  {
+   &quot;section&quot;: 18,
+   &quot;title&quot;: &quot;Final assessment&quot;,
+   &quot;source&quot;: &quot;narrative&quot;,
+   &quot;status&quot;: &quot;info&quot;,
+   &quot;checks&quot;: [],
+   &quot;registry_facts&quot;: {},
+   &quot;manual_items&quot;: [],
+   &quot;findings&quot;: &quot;&quot;
+  }
+ ],
+ &quot;executive_summary&quot;: &quot;&quot;,
+ &quot;recommendations&quot;: [],
+ &quot;final_reason&quot;: &quot;&quot;,
+ &quot;report_date&quot;: &quot;2026-08-27T20:11:02.926606+00:00&quot;,
+ &quot;battery_version&quot;: &quot;dab3f65&quot;
+}</pre></details>
+</section>
+<footer>Captured 2026-08-27 from the live kind fleet (CLOUDOPS_BACKEND_MODE=live) via the running MCP gateway; generated by a capture script, values untouched. Companion to the Cloud Operations Agent PRD and User Flows artifacts.</footer>
+</main>
