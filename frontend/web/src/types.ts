@@ -125,6 +125,8 @@ export interface ReloadError {
 export interface ConsoleMeta {
   mode: string;
   env: string;
+  /** "dev" (persona picker) or "oidc" (verified bearer token). */
+  authMode?: string;
   configVersion: string;
   agentReachable?: boolean;
   batteries?: { attestation: number; app360: number } | null;

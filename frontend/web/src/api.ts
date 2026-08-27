@@ -5,6 +5,20 @@
  */
 import type { ConsoleMeta, Persona, StreamEvent } from "./types";
 
+/**
+ * In oidc mode a real deployment obtains the token from its login flow; for
+ * local testing, paste one into sessionStorage under "cloudops.token" and
+ * every API call carries it. Dev mode sends no Authorization header at all.
+ */
+function authHeaders(): Record<string, string> {
+  try {
+    const token = sessionStorage.getItem("cloudops.token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchUsers(): Promise<Persona[]> {
   const res = await fetch("/api/users");
   const body = (await res.json()) as { users: Persona[] };
@@ -16,6 +30,13 @@ export async function fetchMeta(): Promise<ConsoleMeta> {
   return (await res.json()) as ConsoleMeta;
 }
 
+/** Verified identity in oidc mode; { mode: "dev" } otherwise. */
+export async function fetchMe(): Promise<{ mode: string; claims?: Persona }> {
+  const res = await fetch("/api/me", { headers: authHeaders() });
+  if (!res.ok) return { mode: "oidc" };
+  return (await res.json()) as { mode: string; claims?: Persona };
+}
+
 export async function streamChat(
   message: string,
   userSub: string,
@@ -24,7 +45,7 @@ export async function streamChat(
 ): Promise<void> {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ message, userSub, contextId: contextId ?? undefined }),
   });
   if (!res.ok || !res.body) {

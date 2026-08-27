@@ -6,8 +6,11 @@ export function Masthead(props: {
   selected: string;
   onSelect: (sub: string) => void;
   mode: string;
+  /** "dev" shows the persona picker; "oidc" shows the verified identity. */
+  authMode?: string;
+  me?: Persona | null;
 }) {
-  const current = props.users.find((u) => u.sub === props.selected);
+  const current = props.authMode === "oidc" ? props.me : props.users.find((u) => u.sub === props.selected);
   const initials = (current?.name ?? "?")
     .split(/\s+/)
     .map((w) => w[0])
@@ -19,7 +22,12 @@ export function Masthead(props: {
       <span className="title">Cloud Operations Agent</span>
       <span className="id">
         <span className="pill dim">{props.mode} mode</span>
-        {props.users.length > 0 && (
+        {props.authMode === "oidc" && (
+          <span className="pill dim" title={current?.email ?? ""}>
+            {current ? `${current.name || current.sub}` : "sign-in required"}
+          </span>
+        )}
+        {props.authMode !== "oidc" && props.users.length > 0 && (
           <>
             <span className="pill dim">dev identity</span>
             <select

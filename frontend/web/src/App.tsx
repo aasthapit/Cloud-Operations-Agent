@@ -1,7 +1,7 @@
 /** The console shell: masthead + three columns (PRD section 14 layout). */
 import { useEffect, useReducer, useState } from "react";
 
-import { fetchMeta, fetchUsers, streamChat } from "./api";
+import { fetchMe, fetchMeta, fetchUsers, streamChat } from "./api";
 import { Chat } from "./components/Chat";
 import { ActivityLog } from "./components/ActivityLog";
 import { Masthead } from "./components/Masthead";
@@ -43,12 +43,15 @@ export default function App() {
   const [users, setUsers] = useState<Persona[]>([]);
   const [selected, setSelected] = useState("");
   const [meta, setMeta] = useState<ConsoleMeta>({ mode: "…", env: "dev", configVersion: "" });
+  const [me, setMe] = useState<Persona | null>(null);
 
   useEffect(() => {
     fetchUsers().then((list) => {
       setUsers(list);
       if (list.length > 0) setSelected(list[0].sub);
     });
+    // oidc mode: the bearer token is the identity; show who it verified as.
+    fetchMe().then((res) => setMe(res.claims ?? null));
   }, []);
 
   useEffect(() => {
@@ -79,7 +82,7 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Masthead users={users} selected={selected} onSelect={selectUser} mode={meta.mode} />
+      <Masthead users={users} selected={selected} onSelect={selectUser} mode={meta.mode} authMode={meta.authMode} me={me} />
       <div className="cols">
         <div className="rail-left">
           <ContextCard context={state.context} />

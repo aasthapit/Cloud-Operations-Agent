@@ -13,9 +13,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import express from "express";
-import YAML from "yaml";
 
 import { sendStreamingMessage, type A2AClaims } from "./a2a.js";
+import { AuthError, authConfig, loadUsers, resolveClaims } from "./auth.js";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { FenceParser } from "./normalize.js";
@@ -24,13 +24,6 @@ import { setupTelemetry, tracer } from "./telemetry.js";
 setupTelemetry();
 const app = express();
 app.use(express.json({ limit: "256kb" }));
-
-/** Dev personas, read fresh per request so users.yaml hot-reloads (F9). */
-function loadUsers(): A2AClaims[] {
-  const file = path.join(config.configDir, "identity", "users.yaml");
-  const doc = YAML.parse(fs.readFileSync(file, "utf8")) as { users?: A2AClaims[] };
-  return doc.users ?? [];
-}
 
 /** Config-version chip: same file set the agent hashes (user flow F9). */
 function configVersion(): string {
@@ -58,8 +51,9 @@ app.get("/healthz", (_req, res) => {
 });
 
 app.get("/api/users", (_req, res) => {
-  if (!config.isDev()) {
-    // The picker is a dev affordance only (FR-UI-4); prod uses JWT claims.
+  if (!config.isDev() || authConfig().mode !== "dev") {
+    // The picker is a dev-mode affordance only (FR-UI-4); oidc mode takes
+    // identity exclusively from the verified bearer token.
     res.json({ users: [] });
     return;
   }
@@ -68,6 +62,21 @@ app.get("/api/users", (_req, res) => {
   } catch (err) {
     logger.error({ err }, "users.load_failed");
     res.status(500).json({ error: "could not load identity personas" });
+  }
+});
+
+/** Who the verified token says the caller is (oidc mode; FR-ID-3). */
+app.get("/api/me", async (req, res) => {
+  if (authConfig().mode !== "oidc") {
+    res.json({ mode: "dev" });
+    return;
+  }
+  try {
+    const claims = await resolveClaims({ authorization: req.headers.authorization });
+    res.json({ mode: "oidc", claims });
+  } catch (err) {
+    const publicMessage = err instanceof AuthError ? err.publicMessage : "authentication failed";
+    res.status(401).json({ error: publicMessage });
   }
 });
 
@@ -100,6 +109,7 @@ app.get("/api/meta", async (_req, res) => {
   res.json({
     mode: config.backendMode,
     env: config.env,
+    authMode: authConfig().mode,
     // The agent hashes the same file set; its answer wins when it is up so
     // the chip and the reload error come from one reading of the plane.
     configVersion: status?.config_version ?? configVersion(),
@@ -127,14 +137,18 @@ app.post("/api/chat/stream", async (req, res) => {
     return;
   }
 
-  // Dev identity: resolve the picker's selection to full claims here, the
-  // exact seam where production swaps in JWT validation (FR-ID-3).
-  let claims: A2AClaims = { sub: "", name: "", email: "", groups: [] };
+  // FR-ID-3's seam, now a config toggle: dev resolves the picker's persona,
+  // oidc verifies the bearer token; the claim shape is identical either way.
+  let claims: A2AClaims;
   try {
-    const found = loadUsers().find((u) => u.sub === userSub);
-    if (found) claims = found;
+    claims = await resolveClaims({
+      authorization: req.headers.authorization,
+      userSub,
+    });
   } catch (err) {
-    logger.warn({ err }, "users.load_failed_for_turn");
+    const publicMessage = err instanceof AuthError ? err.publicMessage : "authentication failed";
+    res.status(401).json({ error: publicMessage });
+    return;
   }
 
   res.writeHead(200, {
