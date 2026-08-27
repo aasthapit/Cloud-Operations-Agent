@@ -76,6 +76,43 @@ Keep it for development, not for demos or evaluation.
 `provider: fake` (or `CLOUDOPS_FAKE_LLM=1`, which selects it without editing committed config) swaps in a deterministic in-process model that answers instantly, never calls a tool, and never touches the network.
 It exists so the headless end-to-end test can exercise the whole chain without Ollama; it is not useful for anything a human reads.
 
+## Live mode against a local kind fleet
+
+Mock mode is the default and stays fully working; live mode is opt-in and reads real clusters instead of the synthetic world.
+The reference live fleet is six local [kind](https://kind.sigs.k8s.io) clusters named `acm-hub-1`, `acm-hub-2`, `acm-spoke-1a`, `acm-spoke-1b`, `acm-spoke-2a` and `acm-spoke-2b`, registered under the `live:` section of [config/fleet/fleet.yaml](config/fleet/fleet.yaml), which maps each fleet name to a kubeconfig context.
+
+```bash
+make live-prep     # idempotent: monitoring stack + demo workloads on all six clusters
+make live-smoke    # exercise both live backends against the fleet; binds no ports
+```
+
+`make live-prep` server-side applies the plain manifests in [deploy/live/](deploy/live/): a `monitoring` namespace per cluster with kube-state-metrics and a single-replica Prometheus (emptyDir storage) that scrapes kube-state-metrics, the API server, the kubelet and cAdvisor, and itself, and loads one always-firing `Watchdog` alert so the attestation's dead man's switch is legitimately satisfied.
+It also deploys the demo workloads placement discovery has to find: `payments-api` in `payments-prod` on `acm-spoke-1a` (healthy, 2 replicas) and on `acm-spoke-2a` (2 replicas whose `ledger-sync` container exits non-zero, so the pods really are in CrashLoopBackOff), plus `inventory-sync` in `logistics-dev` on `acm-spoke-1b`.
+The script is scoped to those six contexts and refuses any other cluster, and re-running it is a no-op apart from re-hashing the Prometheus config.
+
+Turn live mode on with one environment variable, which both MCP servers read per call:
+
+```bash
+CLOUDOPS_BACKEND_MODE=live make dev
+```
+
+Credentials come from the kubeconfig on disk (`KUBECONFIG`, else `~/.kube/config`) and never from committed config.
+Every request is a GET, Secret data is never fetched (only names), and each cluster's Prometheus is reached through the API server's service proxy, so live mode needs no port-forward, no NodePort, and no second credential.
+
+### What is not applicable on vanilla Kubernetes
+
+kind clusters have no OpenShift APIs, so `get_cluster_version`, `get_cluster_operators`, `get_machine_config_pools` and `get_pending_csrs` have nothing real to answer.
+Rather than erroring or inventing state, each returns the mock result shape with health-neutral values plus `applicable: false` and the reason `not applicable: vanilla Kubernetes cluster (no OpenShift APIs)`.
+No attestation rule triggers on those values, so the four checks land as plain passes and a healthy kind cluster attests **healthy** rather than degraded or unattestable, with no change to the committed battery.
+Metrics the light monitoring stack does not collect are reported as `null` next to a `*_available` flag, never as a plausible-looking number: an unknown reading must not silently become a healthy one.
+Two readings are honestly unflattering on this fleet: every cluster is single-node, so the capacity check's minus-one-node guard cannot pass and raises a warning row, and the demo workloads expose no HTTP metrics, so golden signals report `instrumented: false`.
+
+### Pointing at real OpenShift later
+
+Replace the entries under `live:` in `fleet.yaml` with your clusters' names and kubeconfig contexts; nothing else in the registry changes.
+Then implement the four OpenShift-only methods in [backend/src/cloudops/mcp_servers/openshift/live.py](backend/src/cloudops/mcp_servers/openshift/live.py) against `config.openshift.io/v1` and `machineconfiguration.openshift.io/v1`, returning the same shapes with `applicable: true`, and the existing battery starts evaluating them without edits.
+For a fleet with ACM and Thanos, point `LiveObservabilityBackend` at the aggregation endpoint instead of fanning out per cluster: the queries are already scoped by the `cluster` label, so that is a change of transport, not of shape.
+
 ## Telemetry
 
 One user turn forms one distributed trace: console, BFF, A2A, orchestrator phases, every check, every gateway call, every MCP tool, every LLM call, with `thread.id` on spans and logs throughout.
@@ -105,11 +142,12 @@ Each user turn is one trace spanning all five services, tagged with `thread.id`,
 ## Development
 
 ```bash
-make check    # ruff + mypy + tsc + pytest (62 tests)
+make check    # ruff + mypy + tsc + pytest (118 tests)
 make test
 ```
 
 The suite is hermetic: it needs no Ollama, no Docker, and no pre-running service, and it never binds a dev port.
+The one test that talks to real clusters is marked `live_smoke` and skips unless `CLOUDOPS_LIVE_SMOKE=1`, so `make test` is unaffected by whether the kind fleet is running.
 [backend/tests/test_e2e_triage.py](backend/tests/test_e2e_triage.py) boots both MCP servers and the gateway in-process on kernel-assigned ports, drives a full triage turn through the fake model, and asserts the typed payloads the console consumes.
 
 Layout: [backend/src/cloudops/](backend/src/cloudops/) (agent, gateway, MCP servers, shared infra, mock fleet), [frontend/](frontend/) (Express BFF + React SPA), [docs/](docs/) (PRD, user flows, research notes, source checklist transcription).
