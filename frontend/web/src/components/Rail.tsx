@@ -27,7 +27,10 @@ export function ContextCard(props: { context: ContextPayload | null }) {
           <>
             <div className="kv"><span className="k">User</span><span className="v">{ctx.user_name || ctx.user_sub}</span></div>
             <div className="kv"><span className="k">Application</span><span className="v mono">{ctx.application}</span></div>
-            <div className="kv"><span className="k">Environment</span><span className="v">{ctx.environment}</span></div>
+            <div className="kv">
+              <span className="k">Environment</span>
+              <span className="v">{ctx.environment}{ctx.environment_assumed ? " (assumed)" : ""}</span>
+            </div>
             <div className="kv"><span className="k">Clusters</span><span className="v mono">{ctx.clusters.join(", ")}</span></div>
             <div className="kv">
               <span className="k">Namespaces</span>

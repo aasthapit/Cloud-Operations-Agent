@@ -56,6 +56,15 @@ agent:
   # answering new questions about that cluster.
   attestation_ttl_seconds: 300
 
+  # Environment assumed when the user names no environment and the thread has
+  # none yet, and the resolved application runs in more than one (FR-CTX-8).
+  # Most applications span environments, so asking would cost nearly every
+  # first turn a question; the assumption is disclosed in the context card and
+  # in the answer, and "switch to nonprod" moves the thread.
+  # Only applied when the application actually has a placement there.
+  # Set to null (or remove the key) to go back to always asking.
+  default_environment: prod
+
   # Automatically run the Application 360 report once user context
   # (application + environment) is resolved. Set false to only run it
   # when the user asks.

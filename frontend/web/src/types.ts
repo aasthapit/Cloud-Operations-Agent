@@ -89,6 +89,9 @@ export interface ContextPayload {
   instances: Array<{ cluster: string; namespace: string; environment: string }>;
   clusters: string[];
   outside_registered_set: boolean;
+  /** Environment taken from the configured default rather than stated by the
+   * user or asked about (FR-CTX-8); the rail marks it as assumed. */
+  environment_assumed?: boolean;
 }
 
 export interface ClarifyPayload {

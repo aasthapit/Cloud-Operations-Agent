@@ -62,6 +62,11 @@ class TestScenarioFaults:
         assert healthy["replicas_mismatch"] == []
 
 
+# What the orchestrator passes every turn, from config/models.yaml agent.* .
+DEFAULT_POLICY = {"default_environment": "prod"}
+STRICT_POLICY = {"default_environment": None}
+
+
 def _prior_payments_prod() -> ResolvedContext:
     """A thread that already resolved payments-api in prod (the F1 baseline)."""
     return ResolvedContext(
@@ -77,9 +82,10 @@ def _prior_payments_prod() -> ResolvedContext:
 
 
 class TestContextResolution:
-    async def _resolve(self, world, registry, claims, text, pending=None, prior=None):
+    async def _resolve(self, world, registry, claims, text, pending=None, prior=None,
+                       policy=DEFAULT_POLICY):
         return await ctx_resolution.resolve(
-            claims, text, registry, WorldGateway(world), prior, pending
+            claims, text, registry, WorldGateway(world), prior, pending, policy
         )
 
     @pytest.mark.asyncio
@@ -126,13 +132,63 @@ class TestContextResolution:
         assert outcome.context.outside_registered_set is True
 
     @pytest.mark.asyncio
-    async def test_env_ambiguity_asks(self, world, registry):
+    async def test_env_ambiguity_assumes_the_default(self, world, registry):
+        """FR-CTX-8: payments-api runs in both environments, so the old
+        behavior asked; with a default configured the turn resolves to prod
+        and says so instead of spending the one question."""
         claims = Claims(sub="app-developer", groups=["payments-eng"])
         outcome, pending = await self._resolve(world, registry, claims,
                                                "how is payments-api doing?")
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.environment == "prod"
+        assert outcome.context.environment_assumed is True
+        assert pending is None
+
+    @pytest.mark.asyncio
+    async def test_env_ambiguity_asks_under_strict_policy(self, world, registry):
+        """FR-CTX-8: `default_environment: null` restores strict clarification."""
+        claims = Claims(sub="app-developer", groups=["payments-eng"])
+        outcome, pending = await self._resolve(world, registry, claims,
+                                               "how is payments-api doing?",
+                                               policy=STRICT_POLICY)
         assert isinstance(outcome, Clarify)
         assert set(outcome.options) == {"prod", "nonprod"}
         assert pending["kind"] == "environment"
+
+    @pytest.mark.asyncio
+    async def test_vague_question_runs_the_full_pipeline(self, world, registry):
+        """F1: 'is my app down' carries neither app nor environment, and still
+        resolves with zero questions (FR-CTX-8)."""
+        claims = Claims(sub="app-developer", groups=["payments-eng"])
+        outcome, pending = await self._resolve(world, registry, claims, "is my app down")
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.scope == "app"
+        assert outcome.context.application == "payments-api"
+        assert outcome.context.environment == "prod"
+        assert outcome.context.environment_assumed is True
+        assert pending is None
+
+    @pytest.mark.asyncio
+    async def test_single_environment_app_is_not_marked_assumed(self, world, registry):
+        """inventory-sync runs only in nonprod: one placement is a fact, not an
+        assumption, and the default never enters into it."""
+        claims = Claims(sub="logistics-dev", groups=["logistics-eng"])
+        outcome, pending = await self._resolve(world, registry, claims, "how is my app?")
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.application == "inventory-sync"
+        assert outcome.context.environment == "nonprod"
+        assert outcome.context.environment_assumed is False
+        assert pending is None
+
+    @pytest.mark.asyncio
+    async def test_stated_environment_is_not_marked_assumed(self, world, registry):
+        """An environment the user named is not an assumption either."""
+        claims = Claims(sub="app-developer", groups=["payments-eng"])
+        outcome, _ = await self._resolve(world, registry, claims,
+                                         "how is payments-api doing in nonprod?")
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.environment == "nonprod"
+        assert outcome.context.environment_assumed is False
 
     @pytest.mark.asyncio
     async def test_direct_cluster_attest(self, world, registry):
