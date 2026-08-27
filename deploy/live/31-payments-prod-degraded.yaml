@@ -1,0 +1,82 @@
+# payments-api, degraded variant for the ring-2 spoke: the main container runs
+# and a second container exits non-zero on every start, so the pods sit in
+# CrashLoopBackOff with real restart counts and real BackOff Warning events.
+# This is the finding the live triage story is built around; nothing about it
+# is simulated in code.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments-prod
+  labels:
+    app.kubernetes.io/part-of: cloudops-live-fleet
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+  namespace: payments-prod
+  labels:
+    app: payments-api
+    app.kubernetes.io/name: payments-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payments-api
+  template:
+    metadata:
+      labels:
+        app: payments-api
+        app.kubernetes.io/name: payments-api
+    spec:
+      containers:
+        - name: payments-api
+          image: busybox:1.36
+          command: [sh, -c, "echo payments-api up; sleep 2147483647"]
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+        - name: ledger-sync
+          image: busybox:1.36
+          command: [sh, -c, "echo ledger-sync cannot reach ledger-kafka; exit 1"]
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-api
+  namespace: payments-prod
+  labels:
+    app.kubernetes.io/name: payments-api
+spec:
+  selector:
+    app: payments-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payments-api
+  namespace: payments-prod
+  labels:
+    app.kubernetes.io/name: payments-api
+spec:
+  rules:
+    - host: payments-api.payments-prod.example.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: payments-api
+                port:
+                  number: 8080

@@ -1,0 +1,81 @@
+# payments-api, healthy variant. Applied to the ring-1 spoke so live-mode
+# context resolution and the App 360 battery have a real, well-behaved
+# workload to find.
+#
+# Both `app` and `app.kubernetes.io/name` are set: the registry's app_label is
+# matched against app.kubernetes.io/name, and kube-state-metrics exports both
+# as label_* columns on kube_pod_labels.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments-prod
+  labels:
+    app.kubernetes.io/part-of: cloudops-live-fleet
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+  namespace: payments-prod
+  labels:
+    app: payments-api
+    app.kubernetes.io/name: payments-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payments-api
+  template:
+    metadata:
+      labels:
+        app: payments-api
+        app.kubernetes.io/name: payments-api
+    spec:
+      containers:
+        - name: payments-api
+          image: busybox:1.36
+          command: [sh, -c, "echo payments-api up; sleep 2147483647"]
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-api
+  namespace: payments-prod
+  labels:
+    app.kubernetes.io/name: payments-api
+spec:
+  selector:
+    app: payments-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Vanilla Kubernetes has no Route; the live backend returns Ingress in the
+# route slot with kind: Ingress so the shape stays identical and the reader
+# is never misled about what was queried.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payments-api
+  namespace: payments-prod
+  labels:
+    app.kubernetes.io/name: payments-api
+spec:
+  rules:
+    - host: payments-api.payments-prod.example.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: payments-api
+                port:
+                  number: 8080

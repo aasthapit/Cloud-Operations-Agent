@@ -1,0 +1,50 @@
+# inventory-sync in logistics-dev: a second application in a second namespace
+# so placement discovery has to discriminate, not just find the only thing
+# running.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logistics-dev
+  labels:
+    app.kubernetes.io/part-of: cloudops-live-fleet
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-sync
+  namespace: logistics-dev
+  labels:
+    app: inventory-sync
+    app.kubernetes.io/name: inventory-sync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-sync
+  template:
+    metadata:
+      labels:
+        app: inventory-sync
+        app.kubernetes.io/name: inventory-sync
+    spec:
+      containers:
+        - name: inventory-sync
+          image: busybox:1.36
+          command: [sh, -c, "echo inventory-sync up; sleep 2147483647"]
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-sync
+  namespace: logistics-dev
+  labels:
+    app.kubernetes.io/name: inventory-sync
+spec:
+  selector:
+    app: inventory-sync
+  ports:
+    - name: http
+      port: 8080
