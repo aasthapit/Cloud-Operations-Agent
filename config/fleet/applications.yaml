@@ -16,7 +16,10 @@ version: 1
 
 applications:
   - application: payments-api
-    app_label: payments-api           # app.kubernetes.io/name on its pods
+    # app.kubernetes.io/name on its pods. deploy/live/3*-*.yaml sets exactly
+    # this label, which is what makes live placement discovery find the app on
+    # acm-spoke-1a (healthy) and acm-spoke-2a (crash-looping sidecar).
+    app_label: payments-api
     owner_groups: [payments-eng]
     criticality: high
     sla: "99.9% monthly"
@@ -154,6 +157,8 @@ applications:
       - { cluster: prod-east-2, namespace: audit-prod, environment: prod }
 
   - application: inventory-sync
+    # Live mode finds this one on acm-spoke-1b in namespace logistics-dev,
+    # deployed with the same label by deploy/live/32-logistics-dev.yaml.
     app_label: inventory-sync
     owner_groups: [logistics-eng]
     criticality: medium

@@ -80,6 +80,67 @@ clusters:
     console_url: https://console.nonprod-west-2.example.internal
     labels: { tier: shared, criticality: low }
 
+# ============================================================================
+# Live-mode fleet. Read ONLY when CLOUDOPS_BACKEND_MODE=live; the mock world
+# builder ignores this key entirely, so the synthetic fleet above is
+# unaffected. Each entry maps a fleet cluster name to a kubeconfig context;
+# credentials stay in the kubeconfig and never appear here (FR-CFG-4).
+#
+# The local reference fleet is six kind clusters (see deploy/live/live-prep.sh):
+# two ACM-style hubs and four spokes, split into ring 1 and ring 2. Ring 1 maps
+# to environment prod and ring 2 to nonprod, which is what the environment
+# default in FR-CTX-8 resolves against.
+# ============================================================================
+live:
+  clusters:
+    - name: acm-hub-1
+      context: kind-acm-hub-1
+      aliases: [hub1, hub-1]
+      environment: prod
+      region: local-kind
+      ring: "1"
+      labels: { role: hub, ring: "1" }
+
+    - name: acm-hub-2
+      context: kind-acm-hub-2
+      aliases: [hub2, hub-2]
+      environment: nonprod
+      region: local-kind
+      ring: "2"
+      labels: { role: hub, ring: "2" }
+
+    - name: acm-spoke-1a
+      context: kind-acm-spoke-1a
+      aliases: [spoke1a, s1a]
+      environment: prod
+      region: local-kind
+      ring: "1"
+      labels: { role: spoke, ring: "1" }
+
+    - name: acm-spoke-1b
+      context: kind-acm-spoke-1b
+      aliases: [spoke1b, s1b]
+      environment: prod
+      region: local-kind
+      ring: "1"
+      labels: { role: spoke, ring: "1" }
+
+    - name: acm-spoke-2a
+      context: kind-acm-spoke-2a
+      aliases: [spoke2a, s2a]
+      environment: nonprod
+      region: local-kind
+      ring: "2"
+      labels: { role: spoke, ring: "2" }
+
+    - name: acm-spoke-2b
+      context: kind-acm-spoke-2b
+      aliases: [spoke2b, s2b]
+      environment: nonprod
+      region: local-kind
+      ring: "2"
+      labels: { role: spoke, ring: "2" }
+
 # Deterministic filler so the registry behaves like a real fleet of hundreds.
 # Names look like ocp-<env>-<region>-<nn>, e.g. ocp-prod-us-east-17.
 synthetic:
