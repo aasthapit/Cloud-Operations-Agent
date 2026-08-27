@@ -71,11 +71,20 @@ export function Chat(props: {
   useEffect(() => {
     // Follow the stream only while the user is already near the bottom;
     // yanking them back down on every chunk makes reading a tall report
-    // mid-stream impossible.
+    // mid-stream impossible. In the stacked (narrow) layout the chat has
+    // no inner scrollbar at all and the PAGE is the scroll container, so
+    // follow whichever one actually scrolls.
     const el = scroller.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (nearBottom) el.scrollTo({ top: el.scrollHeight });
+    const innerScrolls = el.scrollHeight - el.clientHeight > 4;
+    if (innerScrolls) {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (nearBottom) el.scrollTo({ top: el.scrollHeight });
+    } else {
+      const doc = document.documentElement;
+      const nearBottom = doc.scrollHeight - window.scrollY - window.innerHeight < 160;
+      if (nearBottom) window.scrollTo({ top: doc.scrollHeight });
+    }
   }, [props.items]);
 
   const send = (text: string) => {

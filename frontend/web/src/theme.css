@@ -83,15 +83,26 @@ body {
   .rail-right { display: none; }
 }
 /* Below tablet width the fixed app frame stops earning its keep: stack
-   everything, let the PAGE scroll, and keep the chat a viewport-sized
-   window. Nothing is hidden; the rail and log matter on any screen. */
+   everything and let ONE scrollbar (the page) rule. A viewport-sized inner
+   chat window was tried first and failed in practice: the wheel fights
+   between page and chat depending on cursor position, and reading a
+   2000px report through a small nested pane is exactly the complaint.
+   So the chat grows to natural height, the page scrolls linearly through
+   the whole conversation, and the input row stays sticky at the bottom. */
 @media (max-width: 780px) {
   html, body, #root { height: auto; }
   .shell { height: auto; min-height: 100vh; }
   .cols { display: flex; flex-direction: column; }
   .rail-left { overflow: visible; }
   .rail-right { display: flex; }
-  .chatcol { height: 70vh; min-height: 340px; }
+  .chatcol { min-height: 0; }
+  .chatcol .card { flex: none; }
+  .turns { flex: none; overflow: visible; min-height: 200px; }
+  .inrow {
+    position: sticky; bottom: 0; z-index: 5;
+    background: var(--surface);
+    box-shadow: 0 -4px 12px rgba(32, 36, 42, 0.08);
+  }
   .log { min-height: 160px; max-height: 40vh; }
 }
 
