@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     cloudops_mcp_observability_port: int = 8012
 
     # --- inter-service URLs ---
-    cloudops_gateway_url: str = "http://localhost:8010/mcp"
-    cloudops_agent_a2a_url: str = "http://localhost:8001"
+    cloudops_gateway_url: str = "http://127.0.0.1:8010/mcp"
+    cloudops_agent_a2a_url: str = "http://127.0.0.1:8001"
 
     # --- inference ---
     ollama_api_base: str = "http://localhost:11434"

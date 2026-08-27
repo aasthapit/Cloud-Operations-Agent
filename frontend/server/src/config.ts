@@ -29,7 +29,7 @@ export const config = {
   logLevel: process.env.CLOUDOPS_LOG_LEVEL ?? "info",
   backendMode: process.env.CLOUDOPS_BACKEND_MODE ?? "mock",
   /** The agent's A2A endpoint (JSON-RPC root). */
-  agentUrl: process.env.CLOUDOPS_AGENT_A2A_URL ?? "http://localhost:8001",
+  agentUrl: process.env.CLOUDOPS_AGENT_A2A_URL ?? "http://127.0.0.1:8001",
   /** Hot-reloadable config plane root (read fresh per request where used). */
   configDir: findConfigDir(),
   isDev(): boolean {
