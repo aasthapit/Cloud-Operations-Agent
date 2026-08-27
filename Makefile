@@ -3,7 +3,7 @@
 # with only Ollama as a prerequisite (https://ollama.com, `ollama serve`,
 # and a tool-capable model: `ollama pull qwen3:4b`).
 
-.PHONY: setup dev check test lint typecheck telemetry-up telemetry-down
+.PHONY: setup dev check test lint typecheck telemetry-up telemetry-down live-prep live-smoke
 
 setup:  ## install backend (uv) and frontend (npm) dependencies
 	cd backend && uv sync
@@ -23,6 +23,12 @@ lint:
 typecheck:
 	cd backend && uv run mypy src
 	cd frontend && npm run check
+
+live-prep:  ## prepare the six local kind clusters for live mode (idempotent)
+	./deploy/live/live-prep.sh
+
+live-smoke:  ## exercise both live backends against the running kind fleet (binds no ports)
+	cd backend && CLOUDOPS_BACKEND_MODE=live uv run python -m cloudops.mcp_servers.live_smoke
 
 telemetry-up:  ## optional: OTLP collector + Jaeger UI on :16686
 	cd deploy && docker compose up -d

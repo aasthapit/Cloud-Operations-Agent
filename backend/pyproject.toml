@@ -52,6 +52,9 @@ packages = ["src/cloudops"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "live_smoke: talks to the real kind fleet; skipped unless CLOUDOPS_LIVE_SMOKE=1",
+]
 
 [tool.ruff]
 line-length = 100
