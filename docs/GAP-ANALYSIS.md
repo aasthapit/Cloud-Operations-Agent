@@ -2,7 +2,9 @@
 
 Date: 2026-08-26.
 Baseline: develop at f1795fc, after the browser-driven acceptance pass (AC1-AC8 all green).
-This document is the plan of record for the bridge iteration; it will be updated as gaps close.
+This document was the plan of record for the bridge iteration.
+Status 2026-08-27: G1-G8 closed and verified (unit, hermetic E2E, and live browser); G9 documented as an accepted deviation in the README.
+Evidence per gap: G1 delta tick and narrative lead observed live; G2 dead-endpoint turn degraded gracefully with a correlation id; G3 prod-eu-1 attested unattestable with capped-confidence wording; G4 mid-thread scope switch re-resolved without interrogation; G5 export fidelity under 14 golden tests plus shared Copy evidence; G6 reload-rejected pill observed live with last known good serving; G7 hermetic E2E in make check (88 backend tests); G8 gateway hot-reload covered deterministically.
 
 ## 1. Verified working (browser plus test evidence)
 

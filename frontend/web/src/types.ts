@@ -137,7 +137,7 @@ export type StreamEvent =
   | { type: "clarify"; payload: ClarifyPayload }
   | { type: "attestation"; payload: AttestationReport }
   | { type: "app360"; payload: App360Report }
-  | { type: "error"; payload: { correlation_id: string; message: string } }
+  | { type: "error"; payload: { correlation_id: string; message?: string; phase?: string; reason?: string } }
   | { type: "state"; state: string }
   | { type: "done" };
 

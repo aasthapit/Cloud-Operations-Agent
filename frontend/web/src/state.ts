@@ -20,7 +20,7 @@ export type ChatItem =
   | { kind: "phase"; payload: PhasePayload }
   | { kind: "app360"; report: App360Report }
   | { kind: "clarify"; payload: ClarifyPayload }
-  | { kind: "error"; payload: { correlation_id: string; message: string } };
+  | { kind: "error"; payload: { correlation_id: string; message?: string; phase?: string; reason?: string } };
 
 export interface ConsoleState {
   items: ChatItem[];

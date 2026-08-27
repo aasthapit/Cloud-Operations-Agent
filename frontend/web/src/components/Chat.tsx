@@ -46,7 +46,14 @@ function PhaseLine(props: { payload: Record<string, unknown> }) {
       {changes.length > 0 && (
         <strong title={changes.map((c) => c.note).filter(Boolean).join("; ")}>
           {" "}
-          changed: {changes.map((c) => `${c.cluster} ${c.from} → ${c.to}`).join(", ")}
+          changed:{" "}
+          {changes
+            .map((c) =>
+              // Same verdict means the signal set moved (checks cleared or appeared);
+              // "degraded → degraded" reads like a bug, so say what actually happened.
+              c.from === c.to ? `${c.cluster} still ${c.to}${c.note ? ` (${c.note})` : ""}` : `${c.cluster} ${c.from} → ${c.to}`,
+            )
+            .join(", ")}
         </strong>
       )}
     </div>
