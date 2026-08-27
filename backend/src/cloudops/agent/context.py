@@ -255,6 +255,12 @@ async def resolve(
         ), None
 
     envs = sorted({p["environment"] for p in placements})
+    if chosen_env is None and prior is not None and prior.environment in envs:
+        # FR-CTX-7: naming a different application mid-thread changes the
+        # application, not the environment. Re-asking "prod or nonprod?" for
+        # a thread that has been in prod for ten turns is an interrogation
+        # the user already answered.
+        chosen_env = prior.environment
     if chosen_env is None and len(envs) > 1:
         return Clarify(
             f"{chosen_app['application']} runs in {len(envs)} environments. Which one?",

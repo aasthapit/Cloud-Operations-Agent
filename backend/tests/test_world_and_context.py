@@ -1,39 +1,12 @@
 """Mock fleet (resolver, scenario faults, consistency) and context resolution."""
 
-from pathlib import Path
-
 import pytest
+from conftest import CONFIG_DIR, WorldGateway
 
 from cloudops.agent import context as ctx_resolution
 from cloudops.agent.context import Claims, Clarify, Onboarding, Resolved
-from cloudops.common.config import load_yaml
+from cloudops.agent.models import AppInstance, ResolvedContext
 from cloudops.mockfleet import World
-
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
-
-
-@pytest.fixture(scope="module")
-def world() -> World:
-    return World.from_config_dir(CONFIG_DIR)
-
-
-@pytest.fixture(scope="module")
-def registry() -> dict:
-    return load_yaml(CONFIG_DIR / "fleet" / "applications.yaml")
-
-
-class FakeGatewayClient:
-    """Routes the two tools context resolution uses straight to the World."""
-
-    def __init__(self, world: World) -> None:
-        self.world = world
-
-    async def call(self, tool: str, args: dict, timeout_s: float = 30.0) -> dict:
-        if tool == "ocp__resolve_cluster":
-            return self.world.resolve_cluster(args["query"])
-        if tool == "obs__find_app_placements":
-            return self.world.find_app_placements(args["app_label"])
-        raise AssertionError(f"unexpected tool {tool}")
 
 
 class TestFleetResolver:
@@ -89,10 +62,24 @@ class TestScenarioFaults:
         assert healthy["replicas_mismatch"] == []
 
 
+def _prior_payments_prod() -> ResolvedContext:
+    """A thread that already resolved payments-api in prod (the F1 baseline)."""
+    return ResolvedContext(
+        scope="app", user_sub="app-developer", user_name="App Developer",
+        groups=["payments-eng"], application="payments-api", app_label="payments-api",
+        environment="prod",
+        instances=[
+            AppInstance(cluster="prod-east-1", namespace="payments-prod", environment="prod"),
+            AppInstance(cluster="prod-east-2", namespace="payments-prod", environment="prod"),
+        ],
+        clusters=["prod-east-1", "prod-east-2"],
+    )
+
+
 class TestContextResolution:
     async def _resolve(self, world, registry, claims, text, pending=None, prior=None):
         return await ctx_resolution.resolve(
-            claims, text, registry, FakeGatewayClient(world), prior, pending
+            claims, text, registry, WorldGateway(world), prior, pending
         )
 
     @pytest.mark.asyncio
@@ -179,6 +166,55 @@ class TestContextResolution:
         assert ctx_resolution._pick_option("prod-east-1.", options) == "prod-east-1"
         assert ctx_resolution._pick_option("2", options) == "prod-east-1"
         assert ctx_resolution._pick_option("east", options) is None
+
+    @pytest.mark.asyncio
+    async def test_conversational_environment_override(self, world, registry):
+        """FR-CTX-7: 'switch to nonprod' moves the same app to its nonprod
+        instance without re-asking anything."""
+        claims = Claims(sub="app-developer", groups=["payments-eng"])
+        outcome, pending = await self._resolve(
+            world, registry, claims, "switch to nonprod", prior=_prior_payments_prod()
+        )
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.application == "payments-api"
+        assert outcome.context.environment == "nonprod"
+        assert outcome.context.clusters == ["nonprod-east-1"]
+        assert pending is None
+
+    @pytest.mark.asyncio
+    async def test_conversational_application_override(self, world, registry):
+        """FR-CTX-7: naming another application mid-thread switches the app."""
+        claims = Claims(sub="platform-sre", groups=["retail-sre"])
+        outcome, _ = await self._resolve(
+            world, registry, claims, "what about checkout?", prior=_prior_payments_prod()
+        )
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.application == "checkout"
+        assert outcome.context.environment == "prod"
+
+    @pytest.mark.asyncio
+    async def test_application_override_keeps_the_thread_environment(self, world, registry):
+        """Switching application does not re-open the environment question:
+        catalog runs in both environments, and the thread is already in prod."""
+        claims = Claims(sub="platform-sre", groups=["retail-sre"])
+        outcome, _ = await self._resolve(
+            world, registry, claims, "what about catalog?", prior=_prior_payments_prod()
+        )
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.application == "catalog"
+        assert outcome.context.environment == "prod"
+
+    @pytest.mark.asyncio
+    async def test_conversational_cluster_override(self, world, registry):
+        """FR-CTX-7: an explicit attest request wins over the thread's app scope."""
+        claims = Claims(sub="app-developer", groups=["payments-eng"])
+        outcome, _ = await self._resolve(
+            world, registry, claims, "attest nonprod-east-1", prior=_prior_payments_prod()
+        )
+        assert isinstance(outcome, Resolved)
+        assert outcome.context.scope == "cluster"
+        assert outcome.context.clusters == ["nonprod-east-1"]
+        assert outcome.context.application is None
 
     @pytest.mark.asyncio
     async def test_cluster_clarify_reply_resolves_bare_name(self, world, registry):
