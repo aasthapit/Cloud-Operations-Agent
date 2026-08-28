@@ -1,0 +1,35 @@
+# ============================================================================
+# MongoDB: the fleet registry's runtime store (live-cutover design, "MongoDB").
+#
+# Why a container and not an embedded store: the registry is the one piece of
+# state the stack owns rather than reads, and the deployed shape is a real
+# MongoDB. Running the same engine locally keeps the query surface honest
+# (indexes, upserts, distinct) instead of letting a shim drift from prod.
+#
+# Bound to 127.0.0.1 only (NFR-SEC-4): nothing in this stack listens on a
+# routable interface by default. No authentication is configured because the
+# listener is loopback-only and the data is seed fixtures; a deployed instance
+# supplies credentials through CLOUDOPS_MONGO_URL, which lives in .env and
+# never in the committed config tree (FR-CFG-4).
+#
+# The named volume keeps seeded data across `make mongo-down && make mongo-up`.
+# Wipe it with `docker volume rm mongo_cloudops-mongo-data` when a clean
+# re-seed is wanted.
+# ============================================================================
+services:
+  mongo:
+    image: mongo:8
+    container_name: cloudops-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - cloudops-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cloudops-mongo-data:
