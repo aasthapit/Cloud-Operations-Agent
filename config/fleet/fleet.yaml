@@ -81,10 +81,18 @@ clusters:
     labels: { tier: shared, criticality: low }
 
 # ============================================================================
-# Live-mode fleet. Read ONLY when CLOUDOPS_BACKEND_MODE=live; the mock world
-# builder ignores this key entirely, so the synthetic fleet above is
-# unaffected. Each entry maps a fleet cluster name to a kubeconfig context;
-# credentials stay in the kubeconfig and never appear here (FR-CFG-4).
+# Live fleet: SEED DATA for the MongoDB registry's `clusters` collection.
+# `make mongo-seed` loads it; Mongo is the runtime truth from then on, so an
+# edit here only takes effect on the next seed run. The mock world builder
+# ignores this key entirely, so the synthetic fleet above is unaffected.
+#
+# Each entry names the kubeconfig context its cluster is reached through, and
+# the seeder turns that into auth {type: kubeconfig, context: <context>}.
+# Credentials stay in the kubeconfig and never appear here (FR-CFG-4). The
+# other two auth types the registry supports - {type: token, token} and
+# {type: basic, username, password}, which the OAuth challenge flow in
+# kube.py exchanges for a bearer token - carry real secrets and so belong in
+# Mongo directly, never in this committed file.
 #
 # The local reference fleet is six kind clusters (see deploy/live/live-prep.sh):
 # two ACM-style hubs and four spokes, split into ring 1 and ring 2. Ring 1 maps

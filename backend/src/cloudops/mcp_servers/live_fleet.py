@@ -1,13 +1,25 @@
-"""Live-mode fleet registry: fleet cluster name -> kubeconfig context.
+"""Live-mode fleet registry: cluster records -> ready-made KubeClients.
 
-Role: the one place that reads the `live:` section of config/fleet/fleet.yaml
-and hands out ready-made KubeClients. Both live backends share it, so the
-OpenShift and observability servers always agree about which clusters exist
-and which context each one is reached through.
+Role: the one place the live backends ask "which clusters exist, and how do I
+reach this one". Both live backends share it, so the OpenShift and
+observability servers always agree about the fleet.
 
-Seam with mock mode: the `live:` section is invisible to the mock World
-builder, and this module is only constructed by the live backends, so nothing
-here can move a mock-mode result.
+Where the records come from: MongoDB, through cloudops.registry. That is the
+live-cutover change (docs/design/LIVE-CUTOVER.md, "OpenShift MCP changes").
+The `live:` section of config/fleet/fleet.yaml is now only the SEED for those
+records - `make mongo-seed` loads it once and Mongo is the runtime truth from
+then on.
+
+Why there is no watcher here any more. The yaml path re-read the file on
+every access so an edit landed without a restart (FR-CFG-3). Mongo needs no
+equivalent: every accessor queries it fresh, so a record written by an
+operator - a rotated password, a new cluster - is visible to the very next
+call. Hot behaviour is preserved; the mechanism is just a query instead of a
+file read.
+
+Credentials: a cluster record carries an `auth` block. It reaches exactly one
+place, the KubeClient constructor, and is stripped from everything this class
+returns (see `summary`), so no tool result can carry one (FR-MCP-7).
 
 Resolver semantics deliberately mirror cloudops.mockfleet.World.resolve_cluster
 (exact name or alias, then key=value label selector, then substring, then
@@ -23,6 +35,7 @@ from typing import Any
 from cloudops.common.config import load_yaml
 from cloudops.common.settings import get_settings
 from cloudops.mcp_servers.kube import KubeClient
+from cloudops.registry import list_clusters as registry_clusters
 
 
 class LiveFleet:
@@ -36,11 +49,9 @@ class LiveFleet:
     # -- registry ------------------------------------------------------------
 
     def _registry(self) -> dict[str, dict[str, Any]]:
-        """Re-read on every access so a fleet.yaml edit lands without a restart,
-        matching the mock world's hot-reload behaviour (FR-CFG-3)."""
-        fleet = load_yaml(self._settings.config_dir / "fleet" / "fleet.yaml") or {}
-        entries = (fleet.get("live") or {}).get("clusters") or []
-        return {str(e["name"]): dict(e) for e in entries}
+        """Cluster records by name, queried fresh so registry writes land
+        without a restart (the Mongo equivalent of FR-CFG-3's hot reload)."""
+        return {str(doc["name"]): dict(doc) for doc in registry_clusters()}
 
     def names(self) -> list[str]:
         return sorted(self._registry())
@@ -50,18 +61,35 @@ class LiveFleet:
         if entry is None:
             raise ValueError(
                 f"unknown cluster: {cluster!r}; use resolve_cluster first "
-                "(live mode reads the `live:` section of fleet.yaml)"
+                "(clusters live in the MongoDB registry; seed it with `make mongo-seed`)"
             )
         return entry
 
     def context(self, cluster: str) -> str:
-        return str(self.entry(cluster)["context"])
+        """The kubeconfig context a cluster is reached through.
+
+        Only meaningful for kubeconfig-auth records; token and basic records
+        have no context, and callers should use `client` instead.
+        """
+        auth = self.entry(cluster).get("auth") or {}
+        context = auth.get("context")
+        if not context:
+            raise ValueError(
+                f"cluster {cluster!r} does not authenticate through a kubeconfig context "
+                f"(auth type {auth.get('type', 'unset')!r})"
+            )
+        return str(context)
 
     def client(self, cluster: str) -> KubeClient:
-        context = self.context(cluster)
-        if context not in self._clients:
-            self._clients[context] = KubeClient(context)
-        return self._clients[context]
+        """A KubeClient for this cluster, built from its `auth` block.
+
+        Cached by cluster name rather than by context, because token and
+        basic records have no context to key on and two clusters can share
+        one anyway.
+        """
+        if cluster not in self._clients:
+            self._clients[cluster] = KubeClient(self.entry(cluster))
+        return self._clients[cluster]
 
     # -- resolution ----------------------------------------------------------
 
@@ -153,8 +181,11 @@ class LiveFleet:
         entry = self.applications().get(application)
         if entry is None:
             return {"application": application, "found": False}
-        # `instances` is a mock-world placement hint; live placement is always
-        # discovered from kube_pod_labels (FR-CTX-2), never read from here.
-        out: dict[str, Any] = {k: v for k, v in entry.items() if k != "instances"}
+        # `instances` and `live_placements` are registry SEED hints; live
+        # placement is always discovered from the cluster (FR-CTX-2) or asked
+        # of the registry service, never read from here.
+        out: dict[str, Any] = {
+            k: v for k, v in entry.items() if k not in ("instances", "live_placements")
+        }
         out["found"] = True
         return out
