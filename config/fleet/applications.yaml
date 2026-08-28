@@ -10,12 +10,34 @@
 #
 # `instances` below exist for the mock world builder and live-mode hints
 # only; the agent always verifies placement through obs__find_app_placements.
+#
+# SEED FIXTURE for the MongoDB fleet registry (docs/design/LIVE-CUTOVER.md).
+# `python -m cloudops.registry.seed` loads this file into the `apps` and
+# `placements` collections; Mongo is the runtime truth from then on, and an
+# edit here only takes effect on the next seed run.
+#
+#   app_id           short code a human actually types ("SSOP"); the natural
+#                    key of the apps collection and what resolve_entity
+#                    matches exactly
+#   lob              line of business; carried onto every placement so
+#                    blast_radius can answer LOB-scoped questions
+#   live_placements  explicit placements on the reference kind fleet, for the
+#                    apps that are really deployed there by deploy/live/.
+#                    Apps without it get placements DERIVED from `instances`
+#                    by matching each instance's environment to live clusters
+#                    of the same environment (see registry/seed.py). The
+#                    explicit form exists because the kind fleet's
+#                    environment labels do not line up with the demo
+#                    namespaces, and a registry that guesses would then be
+#                    wrong about the one scenario the demo depends on.
 # ============================================================================
 
 version: 1
 
 applications:
   - application: payments-api
+    app_id: PAY
+    lob: Payments
     # app.kubernetes.io/name on its pods. deploy/live/3*-*.yaml sets exactly
     # this label, which is what makes live placement discovery find the app on
     # acm-spoke-1a (healthy) and acm-spoke-2a (crash-looping sidecar).
@@ -45,8 +67,13 @@ applications:
       - { cluster: prod-east-1, namespace: payments-prod, environment: prod }
       - { cluster: prod-east-2, namespace: payments-prod, environment: prod }
       - { cluster: nonprod-east-1, namespace: payments-dev, environment: nonprod }
+    live_placements:
+      - { cluster: acm-spoke-1a, namespace: payments-prod, environment: prod }
+      - { cluster: acm-spoke-2a, namespace: payments-prod, environment: nonprod }
 
   - application: checkout
+    app_id: CHKT
+    lob: Retail
     app_label: checkout
     owner_groups: [retail-sre]
     criticality: high
@@ -71,6 +98,8 @@ applications:
       - { cluster: prod-west-4, namespace: checkout-prod, environment: prod }
 
   - application: loyalty
+    app_id: LOYL
+    lob: Retail
     app_label: loyalty
     owner_groups: [retail-sre]
     criticality: medium
@@ -88,6 +117,8 @@ applications:
       - { cluster: prod-west-4, namespace: loyalty-prod, environment: prod }
 
   - application: refunds
+    app_id: RFND
+    lob: Payments
     app_label: refunds
     owner_groups: [retail-sre]
     criticality: medium
@@ -105,6 +136,8 @@ applications:
       - { cluster: prod-east-1, namespace: refunds-prod, environment: prod }
 
   - application: catalog
+    app_id: CTLG
+    lob: Retail
     app_label: catalog
     owner_groups: [retail-sre]
     criticality: medium
@@ -123,6 +156,8 @@ applications:
       - { cluster: nonprod-east-1, namespace: catalog-dev, environment: nonprod }
 
   - application: pricing
+    app_id: PRCG
+    lob: Retail
     app_label: pricing
     owner_groups: [retail-sre]
     criticality: high
@@ -140,6 +175,8 @@ applications:
       - { cluster: prod-east-1, namespace: pricing-prod, environment: prod }
 
   - application: audit-log
+    app_id: ADTL
+    lob: Compliance
     app_label: audit-log
     owner_groups: [retail-sre]
     criticality: low
@@ -157,6 +194,8 @@ applications:
       - { cluster: prod-east-2, namespace: audit-prod, environment: prod }
 
   - application: inventory-sync
+    app_id: INVS
+    lob: Logistics
     # Live mode finds this one on acm-spoke-1b in namespace logistics-dev,
     # deployed with the same label by deploy/live/32-logistics-dev.yaml.
     app_label: inventory-sync
@@ -174,3 +213,33 @@ applications:
     backup: { policy: source-of-truth upstream, rpo: n/a, rto: n/a }
     instances:
       - { cluster: nonprod-east-1, namespace: logistics-dev, environment: nonprod }
+    live_placements:
+      - { cluster: acm-spoke-1b, namespace: logistics-dev, environment: prod }
+
+  # The self-service operations portal. Its short id is what a user actually
+  # types ("is app SSOP down?"), which is the case the registry resolver has
+  # to get right without a cluster round trip.
+  - application: ssop
+    app_id: SSOP
+    lob: Platform
+    app_label: ssop
+    owner_groups: [platform-sre]
+    criticality: high
+    tier: platform
+    description: Self-service operations portal used by every line of business
+    sla: "99.9% monthly"
+    slo: "p95 latency < 500ms"
+    owners: { business: platform engineering, technical: platform-sre, support_team: platform-sre }
+    on_call: platform-sre-oncall
+    escalation: platform-sre-oncall -> incident commander
+    runbook_url: https://runbooks.example.internal/ssop
+    monitoring_owner: platform-sre
+    docs_status: complete
+    dependencies: [{ name: ssop-db, type: database }]
+    backup: { policy: nightly snapshot, rpo: 24h, rto: 2h }
+    instances:
+      - { cluster: prod-east-1, namespace: ssop-prod, environment: prod }
+      - { cluster: nonprod-east-1, namespace: ssop-dev, environment: nonprod }
+    live_placements:
+      - { cluster: acm-hub-1, namespace: ssop-prod, environment: prod }
+      - { cluster: acm-hub-2, namespace: ssop-dev, environment: nonprod }
