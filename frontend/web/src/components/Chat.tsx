@@ -1,12 +1,14 @@
 /**
  * The AI Assistant column: streamed markdown turns, phase ticks, inline
- * report cards, clarification quick-picks (FR-UI-5), and the input row.
+ * report cards, clarification quick-picks (FR-UI-5), a slash-command
+ * palette, and the input row.
  */
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { ChatItem } from "../state";
+import type { SlashCommand, UiConfig } from "../types";
 import { ReportCard } from "./ReportCard";
 
 /**
@@ -60,13 +62,95 @@ function PhaseLine(props: { payload: Record<string, unknown> }) {
   );
 }
 
+/**
+ * The per-turn "Thinking" block: dimmed, italic, monospace-adjacent, above
+ * the narrative. Collapsed by default; forced open with a shimmer while
+ * `streaming` is true so the console never looks stalled during a long
+ * reasoning pass, then collapses to a "Show thinking (n chars)" toggle.
+ */
+function ThoughtBlock(props: { thought: string; streaming?: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (!props.thought) return null;
+  const expanded = props.streaming || open;
+  const chars = props.thought.length;
+  const lines = props.thought.split("\n").length;
+  return (
+    <div className="thought">
+      <button
+        type="button"
+        className="thought-toggle"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={expanded}
+      >
+        {props.streaming ? (
+          <span className="thought-shimmer">Thinking …</span>
+        ) : open ? (
+          "Hide thinking"
+        ) : (
+          `Show thinking (${chars} chars, ${lines} line${lines === 1 ? "" : "s"})`
+        )}
+      </button>
+      {expanded && <div className="thought-body">{props.thought}</div>}
+    </div>
+  );
+}
+
+/** Command name typed so far, and its argument remainder if the composer
+ * already has "<name> <remainder>". Empty remainder means no arg yet. */
+function splitCommand(draft: string, name: string): string | null {
+  if (draft === name) return "";
+  if (draft.startsWith(name + " ")) return draft.slice(name.length + 1).trim();
+  return null;
+}
+
+function CommandPalette(props: {
+  items: SlashCommand[];
+  activeIndex: number;
+  onSelect: (cmd: SlashCommand) => void;
+  onHover: (index: number) => void;
+}) {
+  if (props.items.length === 0) return null;
+  return (
+    <div className="palette" role="listbox">
+      {props.items.map((c, i) => (
+        <div
+          key={c.name}
+          role="option"
+          aria-selected={i === props.activeIndex}
+          className={`palette-item ${i === props.activeIndex ? "active" : ""}`}
+          onMouseEnter={() => props.onHover(i)}
+          // mousedown (not click) fires before the input blurs, so the
+          // selection lands before focus/composer state settles.
+          onMouseDown={(e) => {
+            e.preventDefault();
+            props.onSelect(c);
+          }}
+        >
+          <span className="palette-name">
+            {c.name}
+            {c.args ? ` ${c.args}` : ""}
+          </span>
+          <span className="palette-desc">{c.description}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Chat(props: {
   items: ChatItem[];
   busy: boolean;
   onSend: (text: string) => void;
+  commands: SlashCommand[];
+  onNewThread: () => void;
+  onSelectPersona: (sub: string) => void;
+  composer: UiConfig["composer"];
 }) {
   const [draft, setDraft] = useState("");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteIndex, setPaletteIndex] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Follow the stream only while the user is already near the bottom;
@@ -90,8 +174,88 @@ export function Chat(props: {
   const send = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || props.busy) return;
+    // Slash commands go through this same path whether typed by hand or
+    // dropped in by the palette, so both routes get identical handling.
+    if (trimmed === "/clear" || trimmed.startsWith("/clear ")) {
+      setDraft("");
+      setPaletteOpen(false);
+      props.onNewThread();
+      return;
+    }
+    const personaArg = splitCommand(trimmed, "/persona");
+    if (personaArg !== null && personaArg) {
+      setDraft("");
+      setPaletteOpen(false);
+      props.onSelectPersona(personaArg);
+      return;
+    }
     setDraft("");
+    setPaletteOpen(false);
     props.onSend(trimmed);
+  };
+
+  const paletteItems = props.commands.filter((c) => c.name.toLowerCase().startsWith(draft.toLowerCase()));
+
+  const onDraftChange = (value: string) => {
+    setDraft(value);
+    const slashPrefix = value.startsWith("/") && !value.slice(1).includes(" ");
+    if (value === "/") {
+      setPaletteOpen(true);
+      setPaletteIndex(0);
+    } else if (paletteOpen && slashPrefix) {
+      setPaletteIndex((i) => Math.min(i, Math.max(paletteItems.length - 1, 0)));
+    } else {
+      setPaletteOpen(false);
+    }
+  };
+
+  const selectCommand = (cmd: SlashCommand) => {
+    setPaletteOpen(false);
+    if (cmd.name === "/clear") {
+      send("/clear");
+      return;
+    }
+    if (cmd.name === "/persona") {
+      const arg = splitCommand(draft, "/persona");
+      if (arg) {
+        send(`/persona ${arg}`);
+      } else {
+        setDraft("/persona ");
+        inputRef.current?.focus();
+      }
+      return;
+    }
+    if (cmd.name === "/attest") {
+      const arg = splitCommand(draft, "/attest");
+      if (arg) {
+        send(`attest ${arg}`);
+      } else {
+        setDraft("attest <cluster> ");
+        inputRef.current?.focus();
+      }
+      return;
+    }
+    // A skill (or any other server-supplied) message command: prefill its
+    // template for editing rather than sending it unreviewed.
+    setDraft(cmd.template ? `${cmd.template} ` : `${cmd.description} `);
+    inputRef.current?.focus();
+  };
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!paletteOpen || paletteItems.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setPaletteIndex((i) => (i + 1) % paletteItems.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setPaletteIndex((i) => (i - 1 + paletteItems.length) % paletteItems.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      selectCommand(paletteItems[paletteIndex]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setPaletteOpen(false);
+    }
   };
 
   return (
@@ -99,16 +263,28 @@ export function Chat(props: {
       <div className="card">
         <div className="hd">
           AI Assistant
-          <span className={`pill ${props.busy ? "streaming" : "idle"}`}>
-            {props.busy ? "streaming" : "idle"}
+          <span className="hd-actions">
+            <button type="button" className="new-thread" onClick={props.onNewThread} disabled={props.busy}>
+              New thread
+            </button>
+            <span className={`pill ${props.busy ? "streaming" : "idle"}`}>
+              {props.busy ? "streaming" : "idle"}
+            </span>
           </span>
         </div>
         <div className="turns" ref={scroller}>
           {props.items.length === 0 && (
             <div className="bubble agent">
               <div className="who">Agent</div>
-              Ask about an application or a cluster; I attest platform health before every answer.
-              Try: <em>Why is payments-api flaky in prod?</em> or <em>attest prod-east-2</em>.
+              {props.composer.emptyStateProse}{" "}
+              Try:{" "}
+              {props.composer.emptyStateExamples.map((example, i) => (
+                <Fragment key={example}>
+                  {i > 0 ? " or " : ""}
+                  <em>{example}</em>
+                </Fragment>
+              ))}
+              .
             </div>
           )}
           {props.items.map((item, i) => {
@@ -124,6 +300,7 @@ export function Chat(props: {
                 return (
                   <div className="bubble agent" key={i}>
                     <div className="who">Agent</div>
+                    {item.thought && <ThoughtBlock thought={item.thought} streaming={item.thoughtStreaming} />}
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeModelMarkdown(item.text)}</ReactMarkdown>
                   </div>
                 );
@@ -164,21 +341,33 @@ export function Chat(props: {
           })}
         </div>
         <form
-          className="inrow"
+          className="inrow-wrap"
           onSubmit={(e) => {
             e.preventDefault();
             send(draft);
           }}
         >
-          <input
-            value={draft}
-            placeholder="Ask a question…"
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={props.busy}
-          />
-          <button type="submit" disabled={props.busy || !draft.trim()}>
-            Send
-          </button>
+          {paletteOpen && (
+            <CommandPalette
+              items={paletteItems}
+              activeIndex={paletteIndex}
+              onSelect={selectCommand}
+              onHover={setPaletteIndex}
+            />
+          )}
+          <div className="inrow">
+            <input
+              ref={inputRef}
+              value={draft}
+              placeholder={props.composer.placeholder}
+              onChange={(e) => onDraftChange(e.target.value)}
+              onKeyDown={onInputKeyDown}
+              disabled={props.busy}
+            />
+            <button type="submit" disabled={props.busy || !draft.trim()}>
+              Send
+            </button>
+          </div>
         </form>
       </div>
     </div>

@@ -13,6 +13,15 @@
 version: 1
 
 users:
+  - sub: guest
+    name: Guest
+    email: guest@example.internal
+    groups: []
+    # Default persona (Console UX, PRD "Persona baseline"): the unregistered
+    # user baseline the web app selects when no persona was chosen yet in
+    # this tab. No registered applications, same as new-joiner below, but
+    # this is the out-of-box identity rather than a named onboarding demo.
+
   - sub: app-developer
     name: App developer
     email: app.developer@example.internal

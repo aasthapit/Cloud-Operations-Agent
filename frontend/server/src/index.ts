@@ -16,14 +16,16 @@ import express from "express";
 
 import { sendStreamingMessage, type A2AClaims } from "./a2a.js";
 import { AuthError, authConfig, loadUsers, resolveClaims } from "./auth.js";
+import { buildCommands } from "./commands.js";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { FenceParser } from "./normalize.js";
 import { setupTelemetry, tracer } from "./telemetry.js";
+import { loadUiConfig } from "./ui.js";
 
 setupTelemetry();
 const app = express();
-app.use(express.json({ limit: "256kb" }));
+app.use(express.json({ limit: config.bodyLimit }));
 
 /** Config-version chip: same file set the agent hashes (user flow F9). */
 function configVersion(): string {
@@ -94,7 +96,7 @@ interface AgentStatus {
 async function agentStatus(): Promise<AgentStatus | null> {
   try {
     const res = await fetch(new URL("/status", config.agentUrl), {
-      signal: AbortSignal.timeout(1500),
+      signal: AbortSignal.timeout(config.statusTimeoutMs),
     });
     if (!res.ok) return null;
     return (await res.json()) as AgentStatus;
@@ -120,10 +122,29 @@ app.get("/api/meta", async (_req, res) => {
   });
 });
 
+/** Slash-command palette source (Console UX): built-ins plus one entry
+ * per enabled skill in config/agent/agent.yaml. */
+app.get("/api/commands", (_req, res) => {
+  try {
+    res.json({ commands: buildCommands(config.isDev() && authConfig().mode === "dev") });
+  } catch (err) {
+    logger.error({ err }, "commands.load_failed");
+    res.status(500).json({ error: "could not load commands" });
+  }
+});
+
+/** SPA console config: poll interval, log cap, composer copy. Always 200;
+ * loadUiConfig() degrades to built-in defaults on a missing/bad file. */
+app.get("/api/ui", (_req, res) => {
+  res.json(loadUiConfig());
+});
+
 /**
  * One chat turn: POST {message, userSub, contextId?} -> SSE of UI events.
  * Event types: meta | phase | context | clarify | attestation | app360 |
- * error | text | state | done (see web/src/types.ts).
+ * thought | error | text | state | done (see web/src/types.ts). `thought`
+ * carries reasoning-model deliberation (ADK's `adk_thought` parts), kept
+ * separate from `text` so the browser never confuses it with narrative.
  */
 app.post("/api/chat/stream", async (req, res) => {
   const { message, userSub, contextId } = req.body as {
@@ -175,6 +196,12 @@ app.post("/api/chat/stream", async (req, res) => {
       // statusUpdates (verified against the ADK A2A executor's stream);
       // forwarding it would duplicate the narrative.
       if (event.kind === "artifactUpdate") continue;
+      // Thoughts precede the narrative they led to within the same update,
+      // and never carry cloudops fences, so they skip the fence parser and
+      // go straight out as their own event.
+      for (const thought of event.thoughts) {
+        send({ type: "thought", text: thought });
+      }
       for (const text of event.texts) {
         for (const ui of parser.push(text)) {
           if (ui.type === "text") send({ type: "text", delta: ui.delta });

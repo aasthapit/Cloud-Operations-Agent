@@ -16,7 +16,16 @@ import type {
 
 export type ChatItem =
   | { kind: "user"; text: string }
-  | { kind: "agent"; text: string }
+  | {
+      kind: "agent";
+      text: string;
+      /** Reasoning-model deliberation for this turn (never exported;
+       * export.ts reads only the typed report payloads). */
+      thought?: string;
+      /** True while thought chunks are still arriving for this turn; the
+       * "Thinking …" block renders live only while this is true. */
+      thoughtStreaming?: boolean;
+    }
   | { kind: "phase"; payload: PhasePayload }
   | { kind: "app360"; report: App360Report }
   | { kind: "clarify"; payload: ClarifyPayload }
@@ -34,6 +43,9 @@ export interface ConsoleState {
    * fallback of the very same question (for card-less A2A clients); the
    * console renders the card, so that text is suppressed until turn end. */
   suppressText: boolean;
+  /** GET /api/ui's activityLogCap (config/ui/console.yaml), set once via
+   * the "configure" action after boot; log() below reads it fresh. */
+  logCap: number;
 }
 
 export const initialState: ConsoleState = {
@@ -45,25 +57,30 @@ export const initialState: ConsoleState = {
   busy: false,
   logs: [],
   suppressText: false,
+  logCap: 200,
 };
 
 export type Action =
   | { type: "send"; text: string }
   | { type: "event"; event: StreamEvent }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { type: "configure"; logCap: number };
 
 function now(): string {
   return new Date().toISOString().slice(11, 23);
 }
 
 function log(state: ConsoleState, tag: string, text: string, tone: LogLine["tone"] = "dim"): LogLine[] {
-  return [...state.logs.slice(-199), { at: now(), tag, text, tone }];
+  const cap = state.logCap > 0 ? state.logCap : 200;
+  return [...state.logs.slice(-(cap - 1)), { at: now(), tag, text, tone }];
 }
 
 export function reducer(state: ConsoleState, action: Action): ConsoleState {
   switch (action.type) {
     case "reset":
-      return { ...initialState, logs: log(state, "ui", "new thread") };
+      // logCap comes from config, not from the conversation, so a reset
+      // must not lose it.
+      return { ...initialState, logCap: state.logCap, logs: log(state, "ui", "new thread") };
     case "send":
       return {
         ...state,
@@ -72,6 +89,8 @@ export function reducer(state: ConsoleState, action: Action): ConsoleState {
         items: [...state.items, { kind: "user", text: action.text }],
         logs: log(state, "ui", `send: ${action.text.slice(0, 60)}`),
       };
+    case "configure":
+      return { ...state, logCap: action.logCap };
     case "event":
       return onEvent(state, action.event);
     default:
@@ -82,10 +101,22 @@ export function reducer(state: ConsoleState, action: Action): ConsoleState {
 function appendText(items: ChatItem[], delta: string): ChatItem[] {
   const last = items[items.length - 1];
   if (last && last.kind === "agent") {
-    return [...items.slice(0, -1), { kind: "agent", text: last.text + delta }];
+    // Real narrative text means the thinking phase for this turn is over,
+    // even if the "Thinking …" block is still expanded from streaming.
+    return [...items.slice(0, -1), { ...last, text: last.text + delta, thoughtStreaming: false }];
   }
   if (!delta.trim()) return items; // don't open a bubble for pure whitespace
   return [...items, { kind: "agent", text: delta }];
+}
+
+/** Thought chunks accumulate on the same agent item as the narrative that
+ * follows them, but in their own field so nothing can conflate the two. */
+function appendThought(items: ChatItem[], delta: string): ChatItem[] {
+  const last = items[items.length - 1];
+  if (last && last.kind === "agent") {
+    return [...items.slice(0, -1), { ...last, thought: (last.thought ?? "") + delta, thoughtStreaming: true }];
+  }
+  return [...items, { kind: "agent", text: "", thought: delta, thoughtStreaming: true }];
 }
 
 function onEvent(state: ConsoleState, event: StreamEvent): ConsoleState {
@@ -95,6 +126,8 @@ function onEvent(state: ConsoleState, event: StreamEvent): ConsoleState {
     case "text":
       if (state.suppressText) return state;
       return { ...state, items: appendText(state.items, event.delta) };
+    case "thought":
+      return { ...state, items: appendThought(state.items, event.text) };
     case "phase": {
       const p = event.payload;
       const tone = p.status === "start" ? "dim" : "ok";
@@ -153,8 +186,16 @@ function onEvent(state: ConsoleState, event: StreamEvent): ConsoleState {
       };
     case "state":
       return { ...state, logs: log(state, "a2a", event.state.replace("TASK_STATE_", "").toLowerCase()) };
-    case "done":
-      return { ...state, busy: false };
+    case "done": {
+      // Defensive: a turn that ends mid-thought (no narrative followed)
+      // must still collapse out of the streaming "Thinking …" state.
+      const last = state.items[state.items.length - 1];
+      const items =
+        last && last.kind === "agent" && last.thoughtStreaming
+          ? [...state.items.slice(0, -1), { ...last, thoughtStreaming: false }]
+          : state.items;
+      return { ...state, busy: false, items };
+    }
     default:
       return state;
   }

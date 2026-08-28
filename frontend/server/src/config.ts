@@ -31,6 +31,12 @@ export const config = {
   agentUrl: process.env.CLOUDOPS_AGENT_A2A_URL ?? "http://127.0.0.1:8001",
   /** Hot-reloadable config plane root (read fresh per request where used). */
   configDir: findConfigDir(),
+  /** express.json() body size limit; large A2A metadata payloads are small,
+   * so the default matches the prior hardcoded "256kb". */
+  bodyLimit: process.env.CLOUDOPS_BFF_BODY_LIMIT ?? "256kb",
+  /** /api/meta's upstream fetch to the agent's /status; short because the
+   * rail polls this and a hung agent must not hang the console. */
+  statusTimeoutMs: Number(process.env.CLOUDOPS_BFF_STATUS_TIMEOUT_MS ?? 1500),
   isDev(): boolean {
     return this.env !== "prod";
   },
