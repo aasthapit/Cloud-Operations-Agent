@@ -3,6 +3,7 @@
 import pytest
 from conftest import CONFIG_DIR
 from fakes import DEGRADED, HEALTHY, UNREACHABLE, node
+from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 
 from cloudops.agent.checks import (
     _lookup,
@@ -25,6 +26,11 @@ from cloudops.agent.models import (
     SectionResult,
 )
 from cloudops.common.config import load_yaml
+
+# LiveFleet resolves cluster records through the MongoDB registry since the
+# live cutover, so the fleet doubles in this module need the seeded mongomock
+# registry standing behind them.
+pytestmark = pytest.mark.usefixtures("seeded_registry")
 
 
 def rule(path: str, op: str, value=None, outcome="fail", reason="r") -> RuleDef:

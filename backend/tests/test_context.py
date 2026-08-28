@@ -10,10 +10,16 @@ from __future__ import annotations
 
 import pytest
 from fakes import APP_LABEL, APP_NS, DEGRADED, HEALTHY, UNREACHABLE, FakeGateway
+from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 
 from cloudops.agent import context as ctx_resolution
 from cloudops.agent.context import Claims, Clarify, Onboarding, Resolved
 from cloudops.agent.models import AppInstance, ResolvedContext
+
+# LiveFleet resolves cluster records through the MongoDB registry since the
+# live cutover, so the fleet doubles in this module need the seeded mongomock
+# registry standing behind them.
+pytestmark = pytest.mark.usefixtures("seeded_registry")
 
 # What the orchestrator passes every turn, from config/models.yaml agent.* .
 DEFAULT_POLICY = {"default_environment": "prod"}

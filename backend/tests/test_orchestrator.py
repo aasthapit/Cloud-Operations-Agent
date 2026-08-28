@@ -25,6 +25,7 @@ from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
 from google.adk.sessions import InMemorySessionService, Session
 from google.genai import types
+from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 
 from cloudops.agent import orchestrator as orchestrator_module
 from cloudops.agent.models import (
@@ -38,6 +39,11 @@ from cloudops.agent.models import (
 )
 from cloudops.agent.orchestrator import TriageOrchestrator, _grounding_text, _is_connection_error
 from cloudops.agent.protocol import extract_fences
+
+# LiveFleet resolves cluster records through the MongoDB registry since the
+# live cutover, so the fleet doubles in this module need the seeded mongomock
+# registry standing behind them.
+pytestmark = pytest.mark.usefixtures("seeded_registry")
 
 PAYMENTS_CLAIMS = {"sub": "app-developer", "name": "App Developer", "groups": ["payments-eng"]}
 

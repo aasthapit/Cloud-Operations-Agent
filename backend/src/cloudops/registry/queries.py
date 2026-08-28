@@ -136,11 +136,18 @@ def find_placements(
 
     Filters are case-insensitive exact matches, not fuzzy: callers resolve
     ambiguous text with resolve_entity first, so that a placement query can
-    never silently widen (FR-MCP-2).
+    never silently widen (FR-MCP-2). The one deliberate widening is WHICH
+    field `app_id` matches: an application is named by its short code
+    ("SSOP"), its display name ("payments-api"), or its pod label, and the
+    agent's context resolver holds the latter two, so the filter accepts any
+    of the three identifiers - each still matched exactly.
     """
     query: dict[str, Any] = {}
+    if app_id is not None and str(app_id).strip():
+        exact = {"$regex": f"^{_escape(str(app_id).strip())}$", "$options": "i"}
+        query["$or"] = [{"app_id": exact}, {"application": exact}, {"app_label": exact}]
     for field_name, value in (
-        ("app_id", app_id), ("cluster", cluster), ("namespace", namespace),
+        ("cluster", cluster), ("namespace", namespace),
         ("environment", environment), ("lob", lob),
     ):
         if value is not None and str(value).strip():

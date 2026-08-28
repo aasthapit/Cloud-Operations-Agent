@@ -17,17 +17,11 @@ Deliberately NOT a sync: documents that vanish from the YAML are left alone.
 An operator who adds a cluster directly to Mongo (the expected path once this
 is deployed) must not have it deleted by the next seed run.
 
-Placement derivation. Each application declares `instances`, which name the
-mock fleet's cluster names, so they cannot be used verbatim against the live
-kind fleet. Two paths:
-
-- `live_placements` on the application entry is used as written. The apps
-  that deploy/live/ actually deploys use this, because guessing would put
-  the demo's degraded payments-api on the wrong cluster.
-- Otherwise each instance is mapped onto a live cluster of the SAME
-  environment (spokes preferred over hubs, which is where workloads run),
-  round-robin by instance order so an application spreads across the
-  environment instead of piling onto one cluster or claiming all of them.
+Placements come from each application's `instances`, used as written: since
+the mock fleet's removal those rows name the live fleet's clusters directly.
+An instance naming a cluster the fleet does not know is skipped with a
+warning rather than seeded, because a registry row nothing can verify would
+only ever resolve to "stale registry row" answers.
 
 Credentials: cluster `auth` blocks are built here but never printed. The
 local fleet is all `{type: "kubeconfig", context: ...}`, which names a
@@ -50,7 +44,7 @@ from cloudops.registry.db import RegistryUnavailable, get_db
 
 # Application-entry keys that describe placement rather than the application
 # itself; they never reach the `apps` collection.
-PLACEMENT_KEYS = ("instances", "live_placements")
+PLACEMENT_KEYS = ("instances",)
 
 
 def _cluster_documents(fleet: dict[str, Any]) -> list[dict[str, Any]]:
@@ -95,22 +89,11 @@ def _app_documents(apps_yaml: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _live_clusters_for(environment: Any, clusters: list[dict[str, Any]]) -> list[str]:
-    """Live cluster names an instance of this environment can land on.
-
-    Spokes are preferred because that is where workloads run on the reference
-    fleet; hubs are the fallback so an environment with no spoke still gets a
-    placement instead of silently dropping the application.
-    """
-    pool = [c for c in clusters if c.get("environment") == environment]
-    spokes = [c for c in pool if str((c.get("labels") or {}).get("role")) == "spoke"]
-    return sorted(c["name"] for c in (spokes or pool))
-
-
 def _placement_documents(
     apps_yaml: dict[str, Any], clusters: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """One placement document per (app, cluster, namespace) permutation."""
+    known = {str(c["name"]) for c in clusters}
     out: dict[tuple[str, str, str], dict[str, Any]] = {}
     for entry in apps_yaml.get("applications") or []:
         base = {
@@ -119,28 +102,18 @@ def _placement_documents(
             "app_label": str(entry.get("app_label") or entry["application"]),
             "lob": entry.get("lob"),
         }
-        rows: list[dict[str, Any]] = []
-        explicit = entry.get("live_placements") or []
-        if explicit:
-            rows = [dict(p) for p in explicit]
-        else:
-            by_env: dict[Any, int] = {}
-            for instance in entry.get("instances") or []:
-                environment = instance.get("environment")
-                candidates = _live_clusters_for(environment, clusters)
-                if not candidates:
-                    continue
-                index = by_env.get(environment, 0)
-                by_env[environment] = index + 1
-                rows.append({
-                    "cluster": candidates[index % len(candidates)],
-                    "namespace": instance.get("namespace"),
-                    "environment": environment,
-                })
-        for row in rows:
-            key = (base["app_id"], str(row["cluster"]), str(row["namespace"]))
+        for instance in entry.get("instances") or []:
+            cluster = str(instance.get("cluster"))
+            if cluster not in known:
+                print(
+                    f"skipping placement {base['app_id']} on {cluster!r}: "
+                    "not a cluster the fleet registry knows",
+                    file=sys.stderr,
+                )
+                continue
+            key = (base["app_id"], cluster, str(instance.get("namespace")))
             out[key] = {**base, "cluster": key[1], "namespace": key[2],
-                        "environment": row.get("environment")}
+                        "environment": instance.get("environment")}
     return [out[k] for k in sorted(out)]
 
 

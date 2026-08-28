@@ -15,7 +15,7 @@ def main() -> None:
     setup_telemetry(SERVICE)
     setup_logging(SERVICE)
     settings = get_settings()
-    serve(build_server(), settings.cloudops_mcp_registry_port, None)
+    serve(build_server(), settings.cloudops_mcp_registry_port)
 
 
 if __name__ == "__main__":

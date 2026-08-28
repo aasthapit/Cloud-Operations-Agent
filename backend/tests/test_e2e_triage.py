@@ -55,9 +55,15 @@ from harness import (  # tests/ is on sys.path under pytest's default import mod
     service_env,
     wait_for_gateway_tools,
 )
+from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 
 from cloudops.agent.model_factory import FAKE_NARRATIVE_PREFIX
 from cloudops.agent.protocol import extract_fences
+
+# LiveFleet resolves cluster records through the MongoDB registry since the
+# live cutover, so the fleet doubles in this module need the seeded mongomock
+# registry standing behind them.
+pytestmark = pytest.mark.usefixtures("seeded_registry")
 
 APP_NAME = "cloudops-e2e"
 

@@ -1,14 +1,8 @@
 """Kubernetes transport for the live backends.
 
 Role: turn ONE CLUSTER RECORD from the fleet registry into a read-only HTTPS
-client against that cluster's API server, plus the two derived access paths
-the live backends need:
-
-- ``get`` / ``get_text`` for the Kubernetes API itself
-- ``prom`` for the cluster's in-cluster Prometheus, reached through the API
-  server's SERVICE PROXY. Going through the proxy means live mode needs no
-  port-forward, no NodePort, and no second set of credentials: the same
-  identity that reads the API also reads Prometheus.
+client against that cluster's API server (``get`` / ``get_text`` /
+``items``).
 
 Three ways a record can authenticate (docs/design/LIVE-CUTOVER.md, "MongoDB"):
 
@@ -446,20 +440,6 @@ class KubeClient:
     def items(self, path: str, **params: Any) -> list[dict[str, Any]]:
         """List call returning just ``items`` (empty when the API group is absent)."""
         return list(self.get(path, **params).get("items") or [])
-
-    # -- Prometheus through the API server's service proxy -------------------
-
-    def prom(self, subpath: str, **params: Any) -> dict[str, Any]:
-        """GET against the in-cluster Prometheus HTTP API.
-
-        subpath is relative to Prometheus' own /api/v1, e.g. 'query' or
-        'alerts'. Raises httpx.HTTPError when the cluster has no Prometheus,
-        which callers turn into an honest 'metric unavailable', never a guess.
-        """
-        base = (
-            "/api/v1/namespaces/monitoring/services/prometheus:9090/proxy/api/v1/"
-        )
-        return self.get(base + subpath.lstrip("/"), **params)
 
     def close(self) -> None:
         self._client.close()

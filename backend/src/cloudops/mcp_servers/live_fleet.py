@@ -1,8 +1,8 @@
 """Live-mode fleet registry: cluster records -> ready-made KubeClients.
 
-Role: the one place the live backends ask "which clusters exist, and how do I
-reach this one". Both live backends share it, so the OpenShift and
-observability servers always agree about the fleet.
+Role: the one place the live backend asks "which clusters exist, and how do
+I reach this one". Cluster naming, credentials, and client caching all live
+here so every tool on the OpenShift MCP server agrees about the fleet.
 
 Where the records come from: MongoDB, through cloudops.registry. That is the
 live-cutover change (docs/design/LIVE-CUTOVER.md, "OpenShift MCP changes").
@@ -21,10 +21,10 @@ Credentials: a cluster record carries an `auth` block. It reaches exactly one
 place, the KubeClient constructor, and is stripped from everything this class
 returns (see `summary`), so no tool result can carry one (FR-MCP-7).
 
-Resolver semantics deliberately mirror cloudops.mockfleet.World.resolve_cluster
-(exact name or alias, then key=value label selector, then substring, then
-fuzzy) because the agent prompt and the console are written against that
-behaviour, not against a backend.
+Resolver semantics (exact name or alias, then key=value label selector,
+then substring, then fuzzy) predate the mock world's removal; the agent
+prompt and the console are written against that behaviour, so it is a
+contract now, not an implementation detail.
 """
 
 from __future__ import annotations

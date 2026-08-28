@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 from fakes import (
     APP_LABEL,
     APP_NS,
@@ -31,6 +30,7 @@ from fakes import (
     pdb,
     pod,
 )
+from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 
 from cloudops.mcp_servers.kube import VANILLA_K8S_REASON
 from cloudops.mcp_servers.live_fleet import LiveFleet
