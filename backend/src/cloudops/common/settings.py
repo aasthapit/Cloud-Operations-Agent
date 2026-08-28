@@ -34,10 +34,19 @@ class Settings(BaseSettings):
     cloudops_gateway_port: int = 8010
     cloudops_mcp_openshift_port: int = 8011
     cloudops_mcp_observability_port: int = 8012
+    cloudops_mcp_registry_port: int = 8013
 
     # --- inter-service URLs ---
     cloudops_gateway_url: str = "http://127.0.0.1:8010/mcp"
     cloudops_agent_a2a_url: str = "http://127.0.0.1:8001"
+
+    # --- fleet registry store ---
+    # MongoDB is the RUNTIME truth for clusters, apps, and placements; the
+    # YAML under config/fleet/ is only seed material (see registry/seed.py).
+    # A deployed instance puts its credentials in the URL, which lives in .env
+    # and never in the committed config tree (FR-CFG-4).
+    cloudops_mongo_url: str = "mongodb://127.0.0.1:27017"
+    cloudops_mongo_db: str = "cloudops"
 
     # --- inference ---
     ollama_api_base: str = "http://localhost:11434"

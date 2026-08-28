@@ -30,6 +30,7 @@ dependencies = [
     # ADK pins opentelemetry >=1.39,<=1.42.1; stay inside that window.
     "opentelemetry-sdk>=1.39,<=1.42.1",
     "opentelemetry-exporter-otlp-proto-http>=1.39,<=1.42.1",
+    "pymongo>=4.17.0",
 ]
 
 [dependency-groups]
@@ -40,6 +41,7 @@ dev = [
     "mypy>=1.11",
     "types-PyYAML",
     "honcho>=2.0",
+    "mongomock>=4.3.0",
 ]
 
 [build-system]
