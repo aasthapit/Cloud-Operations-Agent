@@ -8,7 +8,7 @@ attest the health of every in-scope cluster, resolve who the user is and where t
 
 Full product definition: [docs/PRD.md](docs/PRD.md) (canonical) and the review artifacts (PRD + user flows) linked from the project session.
 
-## Quickstart (mock mode, fully local)
+## Quickstart (local kind fleet)
 
 Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+, and [Ollama](https://ollama.com) serving a tool-capable model:
 
@@ -20,16 +20,17 @@ Then:
 
 ```bash
 make setup   # uv sync + npm install
-make dev     # all six services; Ctrl-C stops everything
+make dev     # every service; Ctrl-C stops everything
 ```
 
 Open http://localhost:5173, pick a dev identity in the masthead, and ask:
 
-- "Why is payments-api flaky in prod?" (app developer: zero-question triage; one cluster attests degraded)
+- "Why is payments-api flaky in prod?" (app developer: zero-question triage against the healthy spoke)
 - "Is my stuff healthy?" (platform SRE: exactly one clarifying question)
-- "attest prod-east-2" (direct cluster attestation)
+- "attest acm-spoke-2a" (direct cluster attestation; the crash-looping spoke)
 
-No cluster access, no cloud credentials: mock mode serves a deterministic synthetic fleet (180 clusters) with scripted faults from [config/mock/scenario.yaml](config/mock/scenario.yaml).
+There is one backend: real cluster telemetry.
+Bring the local kind fleet up first with `make live-prep` (see "The local kind fleet" below); without reachable clusters the agent reports every cluster as unattestable, honestly, rather than inventing state.
 
 ## Services
 
@@ -40,7 +41,6 @@ No cluster access, no cloud credentials: mock mode serves a deterministic synthe
 | Agent (ADK, A2A) | 8001 | `cd backend && uv run python -m cloudops.agent` |
 | MCP gateway | 8010 | `cd backend && uv run python -m cloudops.gateway` |
 | OpenShift MCP | 8011 | `cd backend && uv run python -m cloudops.mcp_servers.openshift` |
-| Observability MCP | 8012 | `cd backend && uv run python -m cloudops.mcp_servers.observability` |
 
 Environment knobs live in [.env.example](.env.example) (copy to `.env`; empty means sane local defaults).
 
@@ -48,13 +48,14 @@ Environment knobs live in [.env.example](.env.example) (copy to `.env`; empty me
 
 Everything behavioral lives under [config/](config/) and applies without restarts:
 
-- `agent/system_prompt.md`, `agent/routing.md`, `agent/skills/*` - re-read on every LLM invocation; edit and the next message behaves differently.
+- `agent/system_prompt.md`, `agent/routing.md`, `agent/skills/*`, `agent/protocol_note.md` - re-read on every LLM invocation; edit and the next message behaves differently.
+- `agent/messages.yaml` - the conversational copy the runtime speaks in its own voice (onboarding, clarification questions, tool-loop guidance). Read fresh per use; a missing key is logged loudly rather than silently falling back to a duplicate string in code.
 - `checks/health_attestation.yaml`, `checks/app360.yaml` - the check batteries; validated on save, atomic swap, last known good on a bad edit. The schema is documented at the top of each file.
 - `gateway/servers.yaml` - registered MCP servers. Adding a cloud domain is one entry here plus optional checks and a skill file; no code changes.
+- `gateway/gateway.yaml` - gateway supervisor behavior (downstream reconnect cadence). Read at gateway boot, not hot: the value is captured by connection loops that outlive a request.
 - `fleet/fleet.yaml`, `fleet/applications.yaml` - cluster registry and application catalog.
 - `identity/users.yaml` - dev personas (production swaps in JWT validation at the BFF, same claim shape).
-- `mock/scenario.yaml` - the mock world's fault script; edit to change the demo story live.
-- `models.yaml` - inference provider/model (binds at agent start) and agent tuning: TTLs, budgets (hot).
+- `models.yaml` - inference provider/model (binds at agent start) and agent tuning: TTLs, budgets (hot). It is authoritative: `provider`, `model`, `temperature` and `max_output_tokens` have no code-side defaults, and a missing key raises an error naming it rather than booting against some other model.
 
 Ollama is reached through its OpenAI-compatible endpoint by default (`provider: openai-compat`), so pointing at a hosted OpenAI-compatible gateway later is an env change, not a code change.
 
@@ -76,42 +77,54 @@ Keep it for development, not for demos or evaluation.
 `provider: fake` (or `CLOUDOPS_FAKE_LLM=1`, which selects it without editing committed config) swaps in a deterministic in-process model that answers instantly, never calls a tool, and never touches the network.
 It exists so the headless end-to-end test can exercise the whole chain without Ollama; it is not useful for anything a human reads.
 
-## Live mode against a local kind fleet
+## The local kind fleet
 
-Mock mode is the default and stays fully working; live mode is opt-in and reads real clusters instead of the synthetic world.
-The reference live fleet is six local [kind](https://kind.sigs.k8s.io) clusters named `acm-hub-1`, `acm-hub-2`, `acm-spoke-1a`, `acm-spoke-1b`, `acm-spoke-2a` and `acm-spoke-2b`, registered under the `live:` section of [config/fleet/fleet.yaml](config/fleet/fleet.yaml), which maps each fleet name to a kubeconfig context.
-
-```bash
-make live-prep     # idempotent: monitoring stack + demo workloads on all six clusters
-make live-smoke    # exercise both live backends against the fleet; binds no ports
-```
-
-`make live-prep` server-side applies the plain manifests in [deploy/live/](deploy/live/): a `monitoring` namespace per cluster with kube-state-metrics and a single-replica Prometheus (emptyDir storage) that scrapes kube-state-metrics, the API server, the kubelet and cAdvisor, and itself, and loads one always-firing `Watchdog` alert so the attestation's dead man's switch is legitimately satisfied.
-It also deploys the demo workloads placement discovery has to find: `payments-api` in `payments-prod` on `acm-spoke-1a` (healthy, 2 replicas) and on `acm-spoke-2a` (2 replicas whose `ledger-sync` container exits non-zero, so the pods really are in CrashLoopBackOff), plus `inventory-sync` in `logistics-dev` on `acm-spoke-1b`.
-The script is scoped to those six contexts and refuses any other cluster, and re-running it is a no-op apart from re-hashing the Prometheus config.
-
-Turn live mode on with one environment variable, which both MCP servers read per call:
+The reference fleet is six local [kind](https://kind.sigs.k8s.io) clusters named `acm-hub-1`, `acm-hub-2`, `acm-spoke-1a`, `acm-spoke-1b`, `acm-spoke-2a` and `acm-spoke-2b`, registered under the `live:` section of [config/fleet/fleet.yaml](config/fleet/fleet.yaml), which maps each fleet name to a kubeconfig context.
 
 ```bash
-CLOUDOPS_BACKEND_MODE=live make dev
+make live-prep     # idempotent: demo workloads on all six clusters
+make live-smoke    # exercise the backend against the fleet; binds no ports
 ```
+
+`make live-prep` server-side applies the plain manifests in [deploy/live/](deploy/live/).
+It still lays down the per-cluster monitoring namespace those manifests carry; nothing reads it any more (see "No metrics pipeline"), and it is kept only so a future metrics domain has somewhere to land.
+It deploys the demo workloads placement verification has to confirm: `payments-api` in `payments-prod` on `acm-spoke-1a` (healthy, 2 replicas) and on `acm-spoke-2a` (2 replicas whose `ledger-sync` container exits non-zero, so the pods really are in CrashLoopBackOff), plus `inventory-sync` in `logistics-dev` on `acm-spoke-1b`.
+The script is scoped to those six contexts and refuses any other cluster, and re-running it is a no-op.
 
 Credentials come from the kubeconfig on disk (`KUBECONFIG`, else `~/.kube/config`) and never from committed config.
-Every request is a GET, Secret data is never fetched (only names), and each cluster's Prometheus is reached through the API server's service proxy, so live mode needs no port-forward, no NodePort, and no second credential.
+Every request is a GET and Secret data is never fetched, only names.
+
+### No metrics pipeline
+
+This deployment reads the Kubernetes API and nothing else.
+There is no Prometheus, Thanos or Grafana behind the agent, so firing alerts, request error rates, latency percentiles, CPU throttling and memory headroom cannot be read.
+Those checks were REMOVED from the batteries rather than faked: [config/checks/health_attestation.yaml](config/checks/health_attestation.yaml) dropped etcd, firing alerts, the Watchdog dead man's switch, the API server SLO and certificate-expiry alerts, and [config/checks/app360.yaml](config/checks/app360.yaml) dropped application alerts, error rate, latency, memory headroom and CPU throttling.
+Sections 9 and 12 of the Application 360 report state that absence in words; nothing invents a number.
+
+What survives is what the API can answer honestly.
+Capacity headroom is computed from node `status.allocatable` against the resource requests of non-terminal pods - the same arithmetic the scheduler does - by `ocp__get_capacity`.
+Autoscaling headroom and disruption budgets come from `ocp__get_autoscaling` (HPA `autoscaling/v2`, PDB `policy/v1`), because those are API objects rather than metrics.
+
+Dropping the Watchdog check also removed the attestation battery's only `unattestable` outcome, so `api-reachability` now carries it: a cluster whose API server did not answer was not attested at all, which is a different claim from "attested and unhealthy" and keeps the FR-ATT-5 confidence cap meaningful.
+
+### Placement: the registry proposes, the cluster confirms
+
+Where an application runs is a two-step contract (FR-CTX-2), never a single lookup.
+`reg__find_placements` returns the fleet registry's candidates, and `ocp__verify_placement` then asks each candidate cluster whether pods matching the app label are actually there.
+A candidate the cluster denies is a stale registry row and is dropped from the report; a candidate whose cluster did not answer is kept and flagged, because an unreachable cluster proves nothing about whether the workload is running.
+When every candidate is denied, the agent says the registry entry looks stale and names what each cluster answered.
 
 ### What is not applicable on vanilla Kubernetes
 
 kind clusters have no OpenShift APIs, so `get_cluster_version`, `get_cluster_operators`, `get_machine_config_pools` and `get_pending_csrs` have nothing real to answer.
-Rather than erroring or inventing state, each returns the mock result shape with health-neutral values plus `applicable: false` and the reason `not applicable: vanilla Kubernetes cluster (no OpenShift APIs)`.
+Rather than erroring or inventing state, each returns the full result shape with health-neutral values plus `applicable: false` and the reason `not applicable: vanilla Kubernetes cluster (no OpenShift APIs)`.
 No attestation rule triggers on those values, so the four checks land as plain passes and a healthy kind cluster attests **healthy** rather than degraded or unattestable, with no change to the committed battery.
-Metrics the light monitoring stack does not collect are reported as `null` next to a `*_available` flag, never as a plausible-looking number: an unknown reading must not silently become a healthy one.
-Two readings are honestly unflattering on this fleet: every cluster is single-node, so the capacity check's minus-one-node guard cannot pass and raises a warning row, and the demo workloads expose no HTTP metrics, so golden signals report `instrumented: false`.
+One reading is honestly unflattering on this fleet: the clusters are small, so the capacity check's minus-one-node guard can fail and raise a warning row rather than claim headroom that is not there.
 
 ### Pointing at real OpenShift later
 
 Replace the entries under `live:` in `fleet.yaml` with your clusters' names and kubeconfig contexts; nothing else in the registry changes.
 Then implement the four OpenShift-only methods in [backend/src/cloudops/mcp_servers/openshift/live.py](backend/src/cloudops/mcp_servers/openshift/live.py) against `config.openshift.io/v1` and `machineconfiguration.openshift.io/v1`, returning the same shapes with `applicable: true`, and the existing battery starts evaluating them without edits.
-For a fleet with ACM and Thanos, point `LiveObservabilityBackend` at the aggregation endpoint instead of fanning out per cluster: the queries are already scoped by the `cluster` label, so that is a change of transport, not of shape.
 
 ## Telemetry
 
@@ -150,6 +163,6 @@ The suite is hermetic: it needs no Ollama, no Docker, and no pre-running service
 The one test that talks to real clusters is marked `live_smoke` and skips unless `CLOUDOPS_LIVE_SMOKE=1`, so `make test` is unaffected by whether the kind fleet is running.
 [backend/tests/test_e2e_triage.py](backend/tests/test_e2e_triage.py) boots both MCP servers and the gateway in-process on kernel-assigned ports, drives a full triage turn through the fake model, and asserts the typed payloads the console consumes.
 
-Layout: [backend/src/cloudops/](backend/src/cloudops/) (agent, gateway, MCP servers, shared infra, mock fleet), [frontend/](frontend/) (Express BFF + React SPA), [docs/](docs/) (PRD, user flows, research notes, source checklist transcription).
+Layout: [backend/src/cloudops/](backend/src/cloudops/) (agent, gateway, MCP servers, shared infra), [frontend/](frontend/) (Express BFF + React SPA), [docs/](docs/) (PRD, user flows, research notes, source checklist transcription).
 
 Branches: `main` (documents + approved milestones), `develop` (integration), `UAT` (cut from develop for product-owner review).
