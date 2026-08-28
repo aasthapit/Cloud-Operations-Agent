@@ -1,0 +1,19 @@
+# ============================================================================
+# MCP gateway behavior.
+#
+# Read at gateway BOOT, not hot-reloaded. Everything here shapes the
+# supervisor loops that own the downstream connections; changing a retry
+# cadence under a live connection would leave half the downstreams on the old
+# schedule, so the honest contract is "restart the gateway to change these".
+# The server REGISTRY (servers.yaml) is the hot-reloaded half: adding,
+# enabling or disabling a downstream still converges without a restart
+# (FR-GW-4).
+# ============================================================================
+
+version: 1
+
+# Seconds to wait before redialling a downstream MCP server whose transport
+# died. Low enough that a restarted server rejoins the catalog while the user
+# is still reading the previous answer, high enough that a server that is
+# down for good does not spin.
+reconnect_delay_seconds: 2.0

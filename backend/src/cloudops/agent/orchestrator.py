@@ -499,6 +499,8 @@ def build_config_dir_paths(config_dir: Path) -> list[Path]:
         config_dir / "checks" / "app360.yaml",
         config_dir / "agent" / "system_prompt.md",
         config_dir / "agent" / "routing.md",
+        config_dir / "agent" / "protocol_note.md",
+        config_dir / "agent" / "messages.yaml",
         config_dir / "agent" / "agent.yaml",
         config_dir / "models.yaml",
     ]

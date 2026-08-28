@@ -14,7 +14,7 @@ version: 3
 battery: health_attestation
 checks:
   - { id: nodes-ready, name: Nodes ready, tool: ocp__get_nodes }
-  - { id: watchdog, name: Watchdog alert, tool: obs__get_alerts }
+  - { id: capacity, name: Capacity headroom, tool: ocp__get_capacity }
 """
 
 APP360 = """

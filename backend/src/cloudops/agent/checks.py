@@ -44,9 +44,27 @@ from cloudops.agent.models import (
     RuleDef,
     SectionResult,
 )
+from cloudops.common.config import load_yaml
+from cloudops.common.settings import get_settings
 
 log = structlog.get_logger("cloudops.checks")
 tracer = trace.get_tracer("cloudops.checks")
+
+# Last-resort ceiling if neither the battery's own `defaults.timeout_seconds`
+# nor agent.yaml's `tuning.check_timeout_seconds` is set. Documented in both
+# files; a battery that says nothing still cannot hang a turn forever.
+_FALLBACK_TIMEOUT_S = 20.0
+
+
+def _battery_timeout(defaults: dict[str, Any]) -> float:
+    """The per-call ceiling for one battery run: the battery's own setting
+    first, then the hot agent tuning key, then the documented floor."""
+    if "timeout_seconds" in defaults:
+        return float(defaults["timeout_seconds"])
+    tuning = load_yaml(
+        get_settings().config_dir / "agent" / "agent.yaml"
+    ).get("tuning") or {}
+    return float(tuning.get("check_timeout_seconds", _FALLBACK_TIMEOUT_S))
 
 _OUTCOME_PRECEDENCE = {
     CheckStatus.UNATTESTABLE: 4,
@@ -285,7 +303,7 @@ async def run_attestation(
     battery: AttestationBattery, clusters: list[str], client: GatewayClient, battery_version: str,
 ) -> list[ClusterAttestation]:
     """Run the attestation battery against every in-scope cluster concurrently."""
-    timeout = float(battery.defaults.get("timeout_seconds", 20))
+    timeout = _battery_timeout(battery.defaults)
 
     async def attest(cluster: str) -> ClusterAttestation:
         start = time.perf_counter()
@@ -355,7 +373,7 @@ async def run_app360(
     battery_version: str,
 ) -> App360Report:
     """Run the App 360 battery for one (application, cluster, namespace)."""
-    timeout = float(battery.defaults.get("timeout_seconds", 20))
+    timeout = _battery_timeout(battery.defaults)
     variables = {
         "cluster": instance.cluster, "namespace": instance.namespace,
         "app_label": app_label, "application": application,

@@ -190,6 +190,12 @@ class AppInstance(BaseModel):
     cluster: str
     namespace: str
     environment: str
+    # FR-CTX-2 evidence: what ocp__verify_placement saw when the registry's
+    # claim about this placement was checked against the cluster itself.
+    verified: bool = True
+    reachable: bool = True
+    pod_count: int = 0
+    ready_count: int = 0
 
 
 class ResolvedContext(BaseModel):
@@ -208,3 +214,7 @@ class ResolvedContext(BaseModel):
     # default rather than asked about. Every surface that shows the environment
     # must show the assumption too (context fence, rail, narrative).
     environment_assumed: bool = False
+    # Set when placements were kept without live confirmation (every cluster
+    # that could have confirmed them refused to answer); every surface that
+    # shows the instances must show this too.
+    placement_note: str | None = None

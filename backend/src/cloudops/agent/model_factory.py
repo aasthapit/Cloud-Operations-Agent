@@ -12,6 +12,11 @@ Three provider styles, two of them against the same local Ollama server:
     CLOUDOPS_FAKE_LLM=1, which lets a test flip the seam without editing
     committed config.
 
+models.yaml is AUTHORITATIVE: provider, model, temperature and
+max_output_tokens have no code-side defaults. A missing key raises
+ModelConfigError naming it, rather than quietly booting against some other
+model than the one the operator configured.
+
 Note on hot reload: `inference.*` (provider/model/temperature) binds at
 agent START because the ADK agent holds its model instance; `agent.*` keys
 in the same file ARE read fresh every turn. models.yaml documents this.
@@ -110,17 +115,37 @@ def _fake_requested(provider: str) -> bool:
     return provider == "fake" or os.environ.get("CLOUDOPS_FAKE_LLM", "") == "1"
 
 
+class ModelConfigError(RuntimeError):
+    """config/models.yaml is missing a key the agent cannot invent."""
+
+
+def _required(cfg: dict[str, Any], key: str) -> Any:
+    """A models.yaml value with no code-side default.
+
+    models.yaml is authoritative for what the agent talks to and how. A code
+    fallback here would let a typo'd or truncated config boot silently against
+    the wrong model, which is far worse than refusing to start.
+    """
+    value = cfg.get(key)
+    if value is None:
+        raise ModelConfigError(
+            f"config/models.yaml is missing `inference.{key}`; it is required "
+            "and has no code default"
+        )
+    return value
+
+
 def build_model(config_dir: Path) -> BaseLlm:
     cfg = load_yaml(config_dir / "models.yaml").get("inference", {})
     settings = get_settings()
-    provider = cfg.get("provider", "openai-compat")
-    model = cfg.get("model", "qwen3:4b")
+    provider = str(_required(cfg, "provider"))
     if _fake_requested(provider):
         log.info("model.configured", provider="fake", model="fake/deterministic")
         return FakeLlm()
+    model = str(_required(cfg, "model"))
     kwargs: dict[str, Any] = {
-        "temperature": cfg.get("temperature", 0.2),
-        "max_tokens": cfg.get("max_output_tokens", 4096),
+        "temperature": _required(cfg, "temperature"),
+        "max_tokens": _required(cfg, "max_output_tokens"),
     }
     if provider == "ollama-chat":
         spec = f"ollama_chat/{model}"

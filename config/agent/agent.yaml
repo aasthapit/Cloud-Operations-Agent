@@ -6,12 +6,18 @@
 #   1. persona_file       - who the agent is, tone, hard rules
 #   2. routing_file       - the triage flow it must follow
 #   3. each enabled skill - focused how-to blocks the persona can lean on
+#   4. protocol_note_file - the wire-protocol rules (never author report
+#                           fences, ground every claim)
 # Editing any of these files (or toggling a skill) takes effect on the very
 # next message in any conversation, with no restart.
+#
+# Conversational copy the runtime speaks itself (onboarding, clarification
+# questions, tool-loop guidance) lives in messages.yaml, read the same way.
 # ============================================================================
 
 persona_file: system_prompt.md
 routing_file: routing.md
+protocol_note_file: protocol_note.md
 
 skills:
   - file: skills/cluster-health-triage.md
@@ -31,3 +37,10 @@ context:
   # Ask for the environment (prod / nonprod) when the application runs in
   # more than one and the user has not said which they mean.
   require_environment: true
+
+# Behavioral constants that used to live as literals in code. Each is read
+# fresh per use; removing a key restores the documented code default.
+tuning:
+  # Per-call ceiling for a check battery's gateway calls when a battery does
+  # not set its own `defaults.timeout_seconds`.
+  check_timeout_seconds: 20

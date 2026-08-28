@@ -29,6 +29,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 
+from cloudops.agent.messages import message
 from cloudops.agent.model_factory import agent_tuning, build_model
 from cloudops.agent.prompts import assemble_instruction
 from cloudops.common.settings import get_settings
@@ -71,12 +72,8 @@ def _tool_budget_callback(tool: Any, args: dict[str, Any], tool_context: Any) ->
     tool_context.state["temp:tool_calls"] = count
     if count > limit:
         log.warning("analyst.tool_budget_exhausted", tool=getattr(tool, "name", "?"), limit=limit)
-        return {
-            "error": (
-                f"Tool budget exhausted ({limit} calls this turn). Answer with the "
-                "evidence you already have and tell the user which check you would run next."
-            )
-        }
+        return {"error": message(
+            get_settings().config_dir, "analyst.tool_budget_exhausted", limit=limit)}
     return None
 
 
@@ -86,30 +83,24 @@ def _tool_error_callback(
     """Convert tool failures into responses the model can act on.
 
     Two cases land here: the model invented a tool name (small local models
-    confuse the ocp__/obs__ prefixes), or a real tool call failed downstream.
+    confuse the ocp__/reg__ prefixes), or a real tool call failed downstream.
     Returning a dict makes it the tool response, so the model gets one honest
     chance to correct itself or report the failure; raising would kill the
     whole turn, which is exactly what F8 forbids for a recoverable error.
     """
     name = getattr(tool, "name", "?")
+    copy = get_settings().config_dir
     if "not found" in str(error).lower():
         log.warning("analyst.unknown_tool", tool=name)
         return {
-            "error": f"No tool named '{name}' exists.",
-            "hint": (
-                "Tool names are exact and prefixed by domain: ocp__* for "
-                "OpenShift cluster and application state, obs__* for metrics, "
-                "alerts, and placements. Re-check the name and retry once, or "
-                "answer from the evidence you already have."
-            ),
+            "error": message(copy, "analyst.unknown_tool", tool=name),
+            "hint": message(copy, "analyst.unknown_tool_hint"),
         }
     log.error("analyst.tool_failed", tool=name, error=str(error))
     return {
-        "error": f"Tool '{name}' failed: {type(error).__name__}.",
-        "hint": (
-            "Do not retry the same call. Tell the user this check could not "
-            "be completed and continue with the evidence you have."
-        ),
+        "error": message(copy, "analyst.tool_failed", tool=name,
+                         error_type=type(error).__name__),
+        "hint": message(copy, "analyst.tool_failed_hint"),
     }
 
 

@@ -2,9 +2,10 @@
 
 The analyst's system instruction is rebuilt from the config plane on EVERY
 LLM invocation: persona + routing + enabled skills (config/agent/agent.yaml
-decides which) + per-turn grounding produced by the deterministic phases.
-Editing any of these files changes behavior on the very next message with
-no restart and no watcher.
+decides which) + the wire-protocol note + per-turn grounding produced by the
+deterministic phases. Every part is a file named by agent.yaml, so editing
+any of them changes behavior on the very next message with no restart and no
+watcher.
 """
 
 from __future__ import annotations
@@ -12,17 +13,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from cloudops.common.config import load_yaml, read_prompt
-
-# Rendered narrative rules the model must know about the wire protocol.
-_PROTOCOL_NOTE = """
-# Output protocol
-
-Structured report cards were already delivered to the console by the runtime
-as ```cloudops-...``` fenced blocks in earlier turns. Never write such fenced
-blocks yourself and never quote their raw JSON; refer to their contents in
-prose. Ground every factual claim in the GROUNDING DATA section below or in
-a tool result from this conversation.
-"""
 
 
 def assemble_instruction(
@@ -42,7 +32,7 @@ def assemble_instruction(
             if skill_path.exists():
                 parts.append(read_prompt(skill_path))
 
-    parts.append(_PROTOCOL_NOTE)
+    parts.append(read_prompt(agent_dir / agent_cfg.get("protocol_note_file", "protocol_note.md")))
     if conversation_text:
         parts.append(f"# Conversation so far\n\n{conversation_text}")
     if task_hint:
