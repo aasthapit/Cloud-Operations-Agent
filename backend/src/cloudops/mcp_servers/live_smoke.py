@@ -1,14 +1,19 @@
-"""Live-mode smoke test: exercise both live backends against the real fleet.
+"""Live smoke test: exercise the OpenShift backend against the real fleet.
 
-Role: prove that CLOUDOPS_BACKEND_MODE=live answers with real cluster data
-before anyone starts the stack. Runs the backends IN PROCESS, so it binds no
-ports and needs neither the gateway nor the agent.
+Role: prove the stack answers with real cluster data before anyone starts it.
+Runs the backend IN PROCESS, so it binds no ports and needs neither the
+gateway nor the agent.
 
     make live-smoke          (or: uv run python -m cloudops.mcp_servers.live_smoke)
 
+There is no Prometheus here: every reading below comes from a Kubernetes API
+server. The registry probes go through the reg__* data-access lib, and they
+SKIP rather than fail when Mongo is not up, so the smoke run is still useful
+on a machine that has the kind fleet but not the registry.
+
 The last block runs the real attestation battery from
 config/checks/health_attestation.yaml through the real check engine against
-the live backends, so the printed verdict is the verdict the agent would
+the live backend, so the printed verdict is the verdict the agent would
 reach. Exit status is non-zero if any row fails.
 """
 
@@ -23,28 +28,43 @@ from cloudops.agent.models import AttestationBattery
 from cloudops.common.config import load_yaml
 from cloudops.common.settings import get_settings
 from cloudops.mcp_servers.live_fleet import LiveFleet
-from cloudops.mcp_servers.observability.live import LiveObservabilityBackend
 from cloudops.mcp_servers.openshift.live import LiveOpenShiftBackend
 
 HEALTHY_SPOKE = "acm-spoke-1a"
 DEGRADED_SPOKE = "acm-spoke-2a"
+APP_NAMESPACE = "payments-prod"
+APP_LABEL = "payments-api"
+
+
+class Skipped(Exception):
+    """A probe that could not run because its dependency is absent.
+
+    Distinct from a failure: the registry lands in parallel with this file, so
+    "Mongo is not up" must read as a gap in coverage, not as a broken fleet.
+    """
 
 
 class Table:
-    """Compact pass/fail table with a non-zero exit on the first failure."""
+    """Compact pass/fail/skip table with a non-zero exit on the first failure."""
 
     def __init__(self) -> None:
-        self.rows: list[tuple[str, bool, str]] = []
+        self.rows: list[tuple[str, str, str]] = []
 
     def check(self, name: str, ok: bool, detail: str) -> bool:
-        self.rows.append((name, ok, detail))
+        self.rows.append((name, "PASS" if ok else "FAIL", detail))
         return ok
+
+    def skip(self, name: str, detail: str) -> None:
+        self.rows.append((name, "SKIP", detail))
 
     def run(self, name: str, fn: Any) -> Any:
         """Run one probe, turning an exception into a failed row rather than a
         traceback: a smoke run should report every check it managed."""
         try:
             ok, detail, value = fn()
+        except Skipped as exc:
+            self.skip(name, str(exc)[:110])
+            return None
         except Exception as exc:  # noqa: BLE001 - the failure IS the result here
             self.check(name, False, f"{type(exc).__name__}: {exc}"[:110])
             return None
@@ -53,24 +73,42 @@ class Table:
 
     def render(self) -> int:
         width = max(len(r[0]) for r in self.rows)
+        colors = {"PASS": "\033[32m", "FAIL": "\033[31m", "SKIP": "\033[33m"}
         print()
-        for name, ok, detail in self.rows:
-            mark = "\033[32mPASS\033[0m" if ok else "\033[31mFAIL\033[0m"
-            print(f"  {mark}  {name.ljust(width)}  {detail}")
-        failed = sum(1 for _, ok, _ in self.rows if not ok)
-        print(f"\n  {len(self.rows) - failed}/{len(self.rows)} checks passed\n")
+        for name, status, detail in self.rows:
+            print(f"  {colors[status]}{status}\033[0m  {name.ljust(width)}  {detail}")
+        failed = sum(1 for _, status, _ in self.rows if status == "FAIL")
+        skipped = sum(1 for _, status, _ in self.rows if status == "SKIP")
+        passed = len(self.rows) - failed - skipped
+        print(f"\n  {passed}/{len(self.rows) - skipped} checks passed"
+              f"{f', {skipped} skipped' if skipped else ''}\n")
         return 1 if failed else 0
+
+
+def _registry() -> Any:
+    """The registry data-access lib, or Skipped when it cannot be used.
+
+    Imported lazily and by name so this module keeps running on a checkout
+    where the registry package has not landed yet.
+    """
+    try:
+        from cloudops.registry import Registry  # type: ignore[attr-defined]
+    except ImportError as exc:
+        raise Skipped(f"registry lib unavailable ({exc})") from exc
+    try:
+        return Registry()
+    except Exception as exc:  # noqa: BLE001 - Mongo down is a skip, not a failure
+        raise Skipped(f"registry unreachable ({type(exc).__name__})") from exc
 
 
 def main() -> int:
     settings = get_settings()
     fleet = LiveFleet()
     ocp = LiveOpenShiftBackend(fleet)
-    obs = LiveObservabilityBackend(fleet)
     t = Table()
 
     print(f"live smoke against {len(fleet.names())} clusters "
-          f"(config: {settings.config_dir}, mode: {settings.cloudops_backend_mode})")
+          f"(config: {settings.config_dir})")
 
     # -- fleet resolution ---------------------------------------------------
 
@@ -113,59 +151,82 @@ def main() -> int:
 
     t.run("OpenShift-only tools n/a", na_contract)
 
-    # -- observability ------------------------------------------------------
+    def namespaces() -> tuple[bool, str, Any]:
+        result = ocp.get_namespaces(HEALTHY_SPOKE)
+        names = {n["name"] for n in result["namespaces"]}
+        return APP_NAMESPACE in names, f"{result['total']} namespaces", result
 
-    def watchdog() -> tuple[bool, str, Any]:
-        missing = [c for c in fleet.names() if not obs.get_firing_alerts(c)["watchdog_present"]]
-        return not missing, (
-            "Watchdog firing on all six clusters" if not missing
-            else "missing on " + ", ".join(missing)
-        ), missing
+    t.run(f"namespaces {HEALTHY_SPOKE}", namespaces)
 
-    t.run("Watchdog dead man's switch", watchdog)
+    # -- registry: candidates, then live verification -----------------------
 
-    def prometheus_query() -> tuple[bool, str, Any]:
-        result = obs.query_instant(f'up{{cluster="{HEALTHY_SPOKE}"}}')
-        # The selector routes the query; Prometheus itself does not stamp the
-        # external label onto local query results, so the count is the signal.
-        return len(result["result"]) >= 3, f"{len(result['result'])} up series", result
+    def registry_resolve() -> tuple[bool, str, Any]:
+        result = _registry().resolve_entity(APP_LABEL)
+        matches = result.get("matches", [])
+        kinds = sorted({m["kind"] for m in matches})
+        return bool(matches), f"{len(matches)} match(es), kinds {', '.join(kinds) or '-'}", result
 
-    t.run("Prometheus instant query", prometheus_query)
+    t.run(f"registry resolve {APP_LABEL}", registry_resolve)
 
-    def placement() -> tuple[bool, str, Any]:
-        result = obs.find_app_placements("payments-api")
-        clusters = sorted(p["cluster"] for p in result["placements"])
-        ok = clusters == sorted([HEALTHY_SPOKE, DEGRADED_SPOKE])
-        pods = sum(int(p["pod_count"]) for p in result["placements"])
-        return ok, f"{', '.join(clusters)} ({pods} pods)", result
+    candidates = t.run("registry placements payments-api", lambda: _registry_placements(APP_LABEL))
+    t.run("registry blast radius", lambda: _blast_radius(HEALTHY_SPOKE))
 
-    t.run("placement discovery payments-api", placement)
+    # Placement verification runs whether or not the registry answered: when it
+    # did not, the fleet's own clusters are the candidate list, which is what
+    # context resolution falls back to reporting anyway.
+    def verify() -> tuple[bool, str, Any]:
+        pairs = (
+            [(p["cluster"], p["namespace"]) for p in candidates]
+            if candidates else [(HEALTHY_SPOKE, APP_NAMESPACE), (DEGRADED_SPOKE, APP_NAMESPACE)]
+        )
+        results = [ocp.verify_placement(c, ns, APP_LABEL) for c, ns in pairs]
+        confirmed = [r for r in results if r["verified"]]
+        detail = ", ".join(
+            f"{r['cluster']}/{r['namespace']} {r['ready_count']}/{r['pod_count']} ready"
+            for r in results
+        )
+        return len(confirmed) == 2, detail, results
 
-    def placement_other() -> tuple[bool, str, Any]:
-        result = obs.find_app_placements("inventory-sync")
-        rows = [f"{p['cluster']}/{p['namespace']}" for p in result["placements"]]
-        return len(rows) == 1, ", ".join(rows) or "not found", result
+    t.run(f"verify placement {APP_LABEL}", verify)
 
-    t.run("placement discovery inventory-sync", placement_other)
+    def verify_absent() -> tuple[bool, str, Any]:
+        """A namespace the app does not run in must come back verified=false,
+        reachable=true. Absence and unreachability are different answers."""
+        result = ocp.verify_placement(HEALTHY_SPOKE, "kube-system", APP_LABEL)
+        ok = result["reachable"] and not result["verified"]
+        return ok, f"kube-system: verified={result['verified']}", result
+
+    t.run("verify placement rejects a wrong namespace", verify_absent)
+
+    # -- capacity and autoscaling -------------------------------------------
 
     def capacity() -> tuple[bool, str, Any]:
-        result = obs.get_capacity_summary(HEALTHY_SPOKE)
-        ok = result["cpu_requests_ratio"] is not None and result["pod_count"] is not None
+        result = ocp.get_capacity(HEALTHY_SPOKE)
+        ok = result["cpu_requests_ratio"] is not None and result["pod_count"] > 0
         return ok, result["summary"], result
 
-    t.run("capacity summary", capacity)
+    t.run("capacity", capacity)
+
+    def autoscaling() -> tuple[bool, str, Any]:
+        result = ocp.get_autoscaling(DEGRADED_SPOKE, APP_NAMESPACE, APP_LABEL)
+        # The kind fleet deploys neither an HPA nor a PDB, so "none present"
+        # is the correct answer; what is asserted is that both API groups
+        # answered rather than erroring.
+        return True, f"{result['hpa_summary']}; {result['pdb_summary']}", result
+
+    t.run("autoscaling", autoscaling)
 
     # -- workload pathology -------------------------------------------------
 
     def healthy_app() -> tuple[bool, str, Any]:
-        result = ocp.get_workloads(HEALTHY_SPOKE, "payments-prod", "payments-api")
+        result = ocp.get_workloads(HEALTHY_SPOKE, APP_NAMESPACE, APP_LABEL)
         ok = result["replicas_summary"] == "2/2 ready" and not result["pods"]["crashloop"]
         return ok, f"{result['replicas_summary']}, no crashloops", result
 
     t.run(f"workloads {HEALTHY_SPOKE}", healthy_app)
 
     def degraded_app() -> tuple[bool, str, Any]:
-        result = ocp.get_workloads(DEGRADED_SPOKE, "payments-prod", "payments-api")
+        result = ocp.get_workloads(DEGRADED_SPOKE, APP_NAMESPACE, APP_LABEL)
         issues = [i for i in result["pods"]["container_issues"] if i["container"] == "ledger-sync"]
         ok = bool(result["replicas_mismatch"]) and bool(issues)
         reasons = sorted({str(i["reason"]) for i in issues})
@@ -174,7 +235,7 @@ def main() -> int:
     t.run(f"workloads {DEGRADED_SPOKE}", degraded_app)
 
     def events() -> tuple[bool, str, Any]:
-        result = ocp.get_events(DEGRADED_SPOKE, "payments-prod")
+        result = ocp.get_events(DEGRADED_SPOKE, APP_NAMESPACE)
         return result["warning_count"] > 0, (
             f"{result['warning_count']} Warning events, top reason "
             f"{result['warnings'][0]['reason'] if result['warnings'] else '-'}"
@@ -186,7 +247,7 @@ def main() -> int:
 
     for cluster in (HEALTHY_SPOKE, DEGRADED_SPOKE):
         def attest(cluster: str = cluster) -> tuple[bool, str, Any]:
-            verdict, signals = live_attestation(cluster, ocp, obs, settings.config_dir)
+            verdict, signals = live_attestation(cluster, ocp, settings.config_dir)
             note = f"verdict {verdict.value}"
             if signals:
                 note += f" ({len(signals)} signal(s): {signals[0][:60]})"
@@ -197,8 +258,20 @@ def main() -> int:
     return t.render()
 
 
-def live_attestation(cluster: str, ocp: Any, obs: Any, config_dir: Any) -> tuple[Any, list[str]]:
-    """Run the committed attestation battery against the live backends.
+def _registry_placements(app_id: str) -> tuple[bool, str, Any]:
+    result = _registry().find_placements(app_id=app_id)
+    rows = list(result.get("placements", []))
+    detail = ", ".join(f"{p['cluster']}/{p['namespace']}" for p in rows) or "none"
+    return len(rows) >= 1, detail, rows
+
+
+def _blast_radius(cluster: str) -> tuple[bool, str, Any]:
+    result = _registry().blast_radius(cluster=cluster)
+    return bool(result.get("apps")), str(result.get("summary", ""))[:110], result
+
+
+def live_attestation(cluster: str, ocp: Any, config_dir: Any) -> tuple[Any, list[str]]:
+    """Run the committed attestation battery against the live backend.
 
     Deliberately reuses the real engine (evaluate_check / derive_verdict) and
     the real battery file: a smoke test that reimplemented the rules would
@@ -206,15 +279,13 @@ def live_attestation(cluster: str, ocp: Any, obs: Any, config_dir: Any) -> tuple
     """
     battery = AttestationBattery.model_validate(
         load_yaml(config_dir / "checks" / "health_attestation.yaml"))
-    backends = {"ocp__": ocp, "obs__": obs}
     results = []
     for check in battery.checks:
-        prefix, _, tool = check.tool.partition("__")
-        backend = backends[prefix + "__"]
+        _, _, tool = check.tool.partition("__")
         args = {k: (cluster if v == "{{ cluster }}" else v) for k, v in check.args.items()}
         start = time.perf_counter()
         try:
-            data, error = getattr(backend, tool)(**args), None
+            data, error = getattr(ocp, tool)(**args), None
         except Exception as exc:  # noqa: BLE001 - an errored check is a check result
             data, error = None, str(exc)[:200]
         rendered = check.model_copy(update={"args": args})
