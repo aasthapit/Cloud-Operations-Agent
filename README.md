@@ -41,6 +41,8 @@ No cluster access, no cloud credentials: mock mode serves a deterministic synthe
 | MCP gateway | 8010 | `cd backend && uv run python -m cloudops.gateway` |
 | OpenShift MCP | 8011 | `cd backend && uv run python -m cloudops.mcp_servers.openshift` |
 | Observability MCP | 8012 | `cd backend && uv run python -m cloudops.mcp_servers.observability` |
+| Fleet registry MCP | 8013 | `make run-registry-mcp` |
+| MongoDB (fleet registry) | 27017 | `make mongo-up` |
 
 Environment knobs live in [.env.example](.env.example) (copy to `.env`; empty means sane local defaults).
 
@@ -75,6 +77,61 @@ Keep it for development, not for demos or evaluation.
 
 `provider: fake` (or `CLOUDOPS_FAKE_LLM=1`, which selects it without editing committed config) swaps in a deterministic in-process model that answers instantly, never calls a tool, and never touches the network.
 It exists so the headless end-to-end test can exercise the whole chain without Ollama; it is not useful for anything a human reads.
+
+## Fleet registry service
+
+The fleet registry is the organization's answer to "who exists and where does it run": applications, clusters, namespaces, and lines of business.
+It is the one part of this stack that holds state rather than configuration, so it lives in MongoDB rather than in the hot-reloaded config tree, and it is served by its own MCP server on port 8013 under the `reg` namespace.
+
+Bring it up and load it:
+
+```bash
+make mongo-up            # mongo:8 as container cloudops-mongo on 127.0.0.1:27017
+make mongo-seed          # config/fleet/*.yaml -> clusters, apps, placements
+make run-registry-mcp    # the reg__* MCP server, standalone on :8013
+```
+
+`make mongo-seed` is idempotent: it upserts by natural key (`clusters.name`, `apps.app_id`, `placements.app_id+cluster+namespace`), so running it twice is indistinguishable from running it once.
+It is a seeder and not a sync, so a document you add to Mongo directly is never deleted by a later seed run.
+The YAML under [config/fleet/](config/fleet/) is therefore seed fixture data; MongoDB is the runtime truth, and a registry write is visible to the very next read without any file watching.
+
+Tools, all namespaced `reg__` by [config/gateway/servers.yaml](config/gateway/servers.yaml):
+
+| Tool | Answers |
+|---|---|
+| `reg__resolve_entity` | free text to entities across apps, clusters, namespaces, LOBs ("is app SSOP down?") |
+| `reg__find_placements` | where an application is registered, filtered by cluster, namespace, environment, or LOB |
+| `reg__list_apps_on_cluster` | what shares a cluster with something |
+| `reg__blast_radius` | what is affected if a cluster, namespace, or line of business goes down |
+| `reg__get_app` | the application registry entry plus its placements |
+| `reg__list_lobs` | every line of business with app and cluster counts |
+
+Resolution goes exact, then alias, then substring, then fuzzy, and every match carries its own score, so several candidates mean the caller confirms rather than guesses.
+These are registry BELIEFS, never observations: a placement is verified against the cluster API before anything is reported as running or down.
+
+If MongoDB is unreachable the server still starts and every tool returns `{"error": "registry unavailable", "detail": ...}`.
+An agent that cannot consult the registry says so; it does not invent a fleet.
+
+### Cluster credentials
+
+A cluster record carries an `auth` block, which is the only thing in the registry that is ever a secret.
+Three forms are supported, and all three are stripped from every tool result:
+
+- `{"type": "kubeconfig", "context": "kind-acm-spoke-1a"}` - the local kind fleet, where credentials stay in the kubeconfig on disk and never enter the database.
+- `{"type": "token", "token": "sha256~..."}` - a bearer token, with optional `insecure_skip_tls_verify` and an inline `ca` PEM.
+- `{"type": "basic", "username": ..., "password": ...}` - exchanged for a bearer token through the cluster's own OAuth server, since OpenShift does not accept basic auth on the API server.
+
+The basic exchange discovers `/.well-known/oauth-authorization-server`, runs the `openshift-challenging-client` implicit flow, and reads the token out of the 302's URL fragment.
+Tokens are cached per cluster until they expire and re-exchanged on a 401, so a rotated credential heals on the next call instead of failing forever.
+Only the `kubeconfig` form belongs in committed YAML; put token and basic records into Mongo directly.
+
+### Environment
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `CLOUDOPS_MONGO_URL` | `mongodb://127.0.0.1:27017` | registry connection string; a deployed instance carries its credentials here, never in `config/` |
+| `CLOUDOPS_MONGO_DB` | `cloudops` | registry database name |
+| `CLOUDOPS_MCP_REGISTRY_PORT` | `8013` | registry MCP server port |
 
 ## Live mode against a local kind fleet
 
