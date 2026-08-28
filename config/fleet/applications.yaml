@@ -5,11 +5,14 @@
 # This registry answers "who owns what" (identity claims' groups are matched
 # against `owner_groups`) and carries the operational facts the Application
 # 360 report's registry-sourced sections render (owners, SLA, backup policy,
-# runbooks, escalation). Where an application RUNS is never taken from this
-# file: placement is discovered live from Prometheus series (FR-CTX-2).
+# runbooks, escalation).
 #
-# `instances` below exist for the mock world builder and live-mode hints
-# only; the agent always verifies placement through ocp__verify_placement.
+# `instances` is SEED data for the registry's `placements` collection
+# (`make mongo-seed`), not an answer. Where an application actually runs is
+# always a two-step contract (FR-CTX-2): the registry proposes candidates,
+# and ocp__verify_placement confirms each one against the cluster API. A
+# placement listed here that no cluster backs is reported as a stale registry
+# row, never as a running instance.
 # ============================================================================
 
 version: 1
@@ -17,7 +20,7 @@ version: 1
 applications:
   - application: payments-api
     # app.kubernetes.io/name on its pods. deploy/live/3*-*.yaml sets exactly
-    # this label, which is what makes live placement discovery find the app on
+    # this label, which is what ocp__verify_placement matches on
     # acm-spoke-1a (healthy) and acm-spoke-2a (crash-looping sidecar).
     app_label: payments-api
     owner_groups: [payments-eng]
@@ -42,9 +45,8 @@ applications:
       rpo: 24h
       rto: 4h
     instances:
-      - { cluster: prod-east-1, namespace: payments-prod, environment: prod }
-      - { cluster: prod-east-2, namespace: payments-prod, environment: prod }
-      - { cluster: nonprod-east-1, namespace: payments-dev, environment: nonprod }
+      - { cluster: acm-spoke-1a, namespace: payments-prod, environment: prod }
+      - { cluster: acm-spoke-2a, namespace: payments-prod, environment: nonprod }
 
   - application: checkout
     app_label: checkout
@@ -66,9 +68,8 @@ applications:
       - { name: orders-db, type: database }
     backup: { policy: continuous WAL shipping, rpo: 15m, rto: 1h }
     instances:
-      - { cluster: prod-east-1, namespace: checkout-prod, environment: prod }
-      - { cluster: prod-east-2, namespace: checkout-prod, environment: prod }
-      - { cluster: prod-west-4, namespace: checkout-prod, environment: prod }
+      - { cluster: acm-hub-1, namespace: checkout-prod, environment: prod }
+      - { cluster: acm-spoke-1a, namespace: checkout-prod, environment: prod }
 
   - application: loyalty
     app_label: loyalty
@@ -85,7 +86,7 @@ applications:
     dependencies: [{ name: loyalty-db, type: database }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 8h }
     instances:
-      - { cluster: prod-west-4, namespace: loyalty-prod, environment: prod }
+      - { cluster: acm-spoke-1b, namespace: loyalty-prod, environment: prod }
 
   - application: refunds
     app_label: refunds
@@ -102,7 +103,7 @@ applications:
     dependencies: [{ name: orders-db, type: database }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 8h }
     instances:
-      - { cluster: prod-east-1, namespace: refunds-prod, environment: prod }
+      - { cluster: acm-spoke-1a, namespace: refunds-prod, environment: prod }
 
   - application: catalog
     app_label: catalog
@@ -119,8 +120,8 @@ applications:
     dependencies: [{ name: catalog-search, type: internal_service }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 8h }
     instances:
-      - { cluster: prod-east-1, namespace: catalog-prod, environment: prod }
-      - { cluster: nonprod-east-1, namespace: catalog-dev, environment: nonprod }
+      - { cluster: acm-spoke-1a, namespace: catalog-prod, environment: prod }
+      - { cluster: acm-spoke-2b, namespace: catalog-dev, environment: nonprod }
 
   - application: pricing
     app_label: pricing
@@ -137,7 +138,7 @@ applications:
     dependencies: [{ name: pricing-cache, type: cache }]
     backup: { policy: config-only, rpo: n/a, rto: 1h }
     instances:
-      - { cluster: prod-east-1, namespace: pricing-prod, environment: prod }
+      - { cluster: acm-spoke-1a, namespace: pricing-prod, environment: prod }
 
   - application: audit-log
     app_label: audit-log
@@ -154,11 +155,11 @@ applications:
     dependencies: [{ name: audit-kafka, type: message_queue }]
     backup: { policy: object storage retention 7y, rpo: 24h, rto: 24h }
     instances:
-      - { cluster: prod-east-2, namespace: audit-prod, environment: prod }
+      - { cluster: acm-hub-1, namespace: audit-prod, environment: prod }
 
   - application: inventory-sync
-    # Live mode finds this one on acm-spoke-1b in namespace logistics-dev,
-    # deployed with the same label by deploy/live/32-logistics-dev.yaml.
+    # Deployed on acm-spoke-1b in namespace logistics-dev with the same
+    # label by deploy/live/32-logistics-dev.yaml.
     app_label: inventory-sync
     owner_groups: [logistics-eng]
     criticality: medium
@@ -173,4 +174,4 @@ applications:
     dependencies: [{ name: warehouse-api, type: external_api }]
     backup: { policy: source-of-truth upstream, rpo: n/a, rto: n/a }
     instances:
-      - { cluster: nonprod-east-1, namespace: logistics-dev, environment: nonprod }
+      - { cluster: acm-spoke-1b, namespace: logistics-dev, environment: prod }

@@ -12,6 +12,12 @@ candidates through reg__find_placements, and every candidate is then
 CONFIRMED against the cluster itself through ocp__verify_placement. A
 registry row nothing backs never reaches the report.
 
+Ordering note: the environment is scoped from the REGISTRY's candidate list,
+before verification, because the registry is what knows an application spans
+prod and nonprod - a prod cluster that happens to be down must not silently
+turn a two-environment application into a one-environment one. Verification
+then narrows within the chosen environment.
+
 Application ambiguity always asks; environment ambiguity does not have to.
 FR-CTX-8 gives the environment a configured default (policy["default_environment"],
 carried from the hot agent tuning by the orchestrator): when the application is

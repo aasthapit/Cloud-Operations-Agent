@@ -344,10 +344,10 @@ class LiveOpenShiftBackend:
         """Does this app actually run here? The registry proposes, the cluster
         API confirms (FR-CTX-2).
 
-        Never raises: an unreachable cluster, a missing namespace and an empty
-        selector are three different honest answers, and context resolution
-        needs to tell them apart rather than lose the whole turn to one bad
-        candidate.
+        Never raises. An unreachable cluster, a namespace that does not exist
+        and a namespace with no matching pods are three different honest
+        answers, and context resolution has to tell them apart rather than
+        lose the whole turn to one bad candidate.
         """
         result: dict[str, Any] = {
             "cluster": cluster, "namespace": namespace, "app_label": app_label,
@@ -358,6 +358,12 @@ class LiveOpenShiftBackend:
             selector = self._selector(client, namespace, app_label)
             pods = client.items(
                 f"/api/v1/namespaces/{namespace}/pods", labelSelector=selector)
+        except httpx.HTTPStatusError as exc:
+            # The API server ANSWERED - a missing namespace, or a forbidden
+            # one. That is "the app is not there", not "the cluster is down",
+            # and context resolution treats those two very differently.
+            result["reason"] = f"HTTP {exc.response.status_code} for namespace {namespace}"
+            return result
         except Exception as exc:  # noqa: BLE001 - unreachable IS the reading here
             result["reachable"] = False
             result["reason"] = f"{type(exc).__name__}: {exc}"[:200]

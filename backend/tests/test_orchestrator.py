@@ -1,9 +1,10 @@
 """Turn-lifecycle tests for the deterministic orchestrator.
 
-These drive _run_async_impl directly against the mock World and a stubbed
-analyst, applying each event's state_delta the way the ADK runner does, so a
-whole turn (context, attestation, App 360, grounding, narrative hand-off) is
-exercised without a gateway, an inference backend, or a port.
+These drive _run_async_impl directly against the FakeGateway (canned cluster
+APIs plus the registry contract) and a stubbed analyst, applying each event's
+state_delta the way the ADK runner does, so a whole turn (context,
+attestation, App 360, grounding, narrative hand-off) is exercised without a
+real gateway, an inference backend, or a port.
 
 Covered: the F5 re-attestation delta (G1), the F8 narrative degrade (G2), the
 FR-ATT-5 unattestable confidence cap (G3), and FR-CTX-7 scope invalidation
@@ -18,7 +19,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
-from conftest import WorldGateway
+from fakes import APP_NS, DEGRADED, HEALTHY, UNREACHABLE
 from google.adk.agents import LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
@@ -28,6 +29,9 @@ from google.genai import types
 from cloudops.agent import orchestrator as orchestrator_module
 from cloudops.agent.models import (
     AttestationChange,
+    CheckEvidence,
+    CheckResult,
+    CheckStatus,
     ClusterAttestation,
     ClusterVerdict,
     ResolvedContext,
@@ -101,9 +105,9 @@ class Turn:
 class Conversation:
     """A session plus the runner behavior the orchestrator depends on."""
 
-    def __init__(self, world: Any, analyst: LlmAgent, claims: dict[str, Any]) -> None:
+    def __init__(self, gateway: Any, analyst: LlmAgent, claims: dict[str, Any]) -> None:
         self.orchestrator = TriageOrchestrator(analyst=analyst)
-        self.gateway = WorldGateway(world)
+        self.gateway = gateway
         self.session = Session(
             id="thread-1", app_name="cloudops", user_id=str(claims["sub"]),
             state={"claims": claims},
@@ -134,11 +138,11 @@ class Conversation:
 
 
 @pytest.fixture
-def conversation(world, monkeypatch):
-    """Factory: a conversation whose gateway is the mock World."""
+def conversation(gateway, monkeypatch):
+    """Factory: a conversation whose gateway is the FakeGateway."""
 
     def build(analyst: LlmAgent | None = None, claims: dict[str, Any] | None = None) -> Conversation:
-        convo = Conversation(world, analyst or StubAnalyst(name="analyst"), claims or PAYMENTS_CLAIMS)
+        convo = Conversation(gateway, analyst or StubAnalyst(name="analyst"), claims or PAYMENTS_CLAIMS)
         monkeypatch.setattr(
             orchestrator_module, "GatewayClient", lambda *a, **k: convo.gateway
         )
@@ -147,10 +151,15 @@ def conversation(world, monkeypatch):
     return build
 
 
-def _stale_entry(cluster: str, verdict: str) -> dict[str, Any]:
+def _stale_entry(cluster: str, verdict: str, failing: tuple[str, ...] = ()) -> dict[str, Any]:
     """A cached attestation old enough that the TTL forces a re-run (F5)."""
     report = ClusterAttestation(
-        cluster=cluster, verdict=ClusterVerdict(verdict), signals=[], checks=[],
+        cluster=cluster, verdict=ClusterVerdict(verdict), signals=[],
+        checks=[
+            CheckResult(id=cid, name=cid, severity="critical", status=CheckStatus.FAIL,
+                        evidence=CheckEvidence(tool="t", args={}, timestamp="now"))
+            for cid in failing
+        ],
         battery_version="stale",
     )
     return {
@@ -172,42 +181,41 @@ class TestAttestationDeltaInATurn:
     @pytest.mark.asyncio
     async def test_stale_reattestation_reports_the_verdict_delta(self, conversation):
         convo = conversation()
-        # The thread last saw prod-east-2 healthy, long enough ago that the
-        # TTL has expired; the scenario has it degraded now.
+        # The thread last saw the app's host cluster degraded on a NotReady
+        # node, long enough ago that the TTL has expired; it is healthy now.
         convo.session.state["attestation_cache"] = {
-            "by_cluster": {"prod-east-2": _stale_entry("prod-east-2", "healthy")}
+            "by_cluster": {HEALTHY: _stale_entry(HEALTHY, "degraded", ("nodes",))}
         }
         turn = await convo.say("why is payments-api flaky in prod?")
 
         changes = turn.phase("attestation", "done")["changes"]
-        assert [c["cluster"] for c in changes] == ["prod-east-2"]
-        assert (changes[0]["from"], changes[0]["to"]) == ("healthy", "degraded")
-        assert "cluster-operators" in changes[0]["note"]
-        # prod-east-1 was never attested in this thread: no delta for it.
+        assert [c["cluster"] for c in changes] == [HEALTHY]
+        assert (changes[0]["from"], changes[0]["to"]) == ("degraded", "healthy")
+        assert changes[0]["note"] == "cleared: nodes"
         assert turn.of("attestation")[0]["changes"] == [
-            f"prod-east-2: healthy -> degraded ({changes[0]['note']})"
+            f"{HEALTHY}: degraded -> healthy (cleared: nodes)"
         ]
 
     @pytest.mark.asyncio
     async def test_change_leads_the_analyst_grounding(self, conversation):
         convo = conversation()
         convo.session.state["attestation_cache"] = {
-            "by_cluster": {"prod-east-2": _stale_entry("prod-east-2", "healthy")}
+            "by_cluster": {HEALTHY: _stale_entry(HEALTHY, "degraded", ("nodes",))}
         }
         grounding = (await convo.say("any update on payments-api in prod?")).grounding()
         assert grounding.startswith("CHANGE SINCE THE LAST ATTESTATION")
-        assert "prod-east-2: healthy -> degraded" in grounding
+        assert f"{HEALTHY}: degraded -> healthy" in grounding
 
 
 class TestGroundingText:
     """The two directives that may precede the evidence payload."""
 
     def _context(self) -> ResolvedContext:
-        return ResolvedContext(scope="cluster", clusters=["prod-eu-1"])
+        return ResolvedContext(scope="cluster", clusters=[UNREACHABLE])
 
     def _attestation(self, verdict: ClusterVerdict) -> ClusterAttestation:
-        return ClusterAttestation(cluster="prod-eu-1", verdict=verdict,
-                                  signals=["watchdog-present: not firing"], checks=[])
+        return ClusterAttestation(cluster=UNREACHABLE, verdict=verdict,
+                                  signals=["api-reachability: did not respond"], checks=[])
 
     def test_no_lead_when_nothing_changed(self):
         text = _grounding_text(self._context(), [self._attestation(ClusterVerdict.HEALTHY)], [], [])
@@ -216,37 +224,39 @@ class TestGroundingText:
         assert json.loads(text)["attestation_changes"] == []
 
     def test_change_line_present_only_when_changed(self):
-        change = AttestationChange(cluster="prod-eu-1", from_verdict="degraded",
+        change = AttestationChange(cluster=UNREACHABLE, from_verdict="degraded",
                                    to_verdict="healthy", note="cleared: nodes")
         text = _grounding_text(
             self._context(), [self._attestation(ClusterVerdict.HEALTHY)], [change], []
         )
         assert text.startswith("CHANGE SINCE THE LAST ATTESTATION")
-        assert "prod-eu-1: degraded -> healthy (cleared: nodes)" in text
+        assert f"{UNREACHABLE}: degraded -> healthy (cleared: nodes)" in text
 
     def test_unattestable_cluster_caps_confidence(self):
         text = _grounding_text(
             self._context(), [self._attestation(ClusterVerdict.UNATTESTABLE)], [], []
         )
-        assert "CONFIDENCE CAP for prod-eu-1" in text
+        assert f"CONFIDENCE CAP for {UNREACHABLE}" in text
         assert "CANNOT be confirmed" in text
 
 
 class TestUnattestableTurn:
-    """G3 / FR-ATT-5, end to end through a direct attestation turn."""
+    """G3 / FR-ATT-5, end to end through a direct attestation turn. A cluster
+    whose API did not answer was not attested; the turn must say so and cap
+    what may be claimed, never call it degraded or healthy."""
 
     @pytest.mark.asyncio
-    async def test_attesting_the_watchdog_absent_cluster(self, conversation):
-        turn = await conversation().say("attest prod-eu-1")
+    async def test_attesting_an_unreachable_cluster(self, conversation):
+        turn = await conversation().say(f"attest {UNREACHABLE}")
 
         report = turn.of("attestation")[0]
         assert [c["verdict"] for c in report["clusters"]] == ["unattestable"]
-        assert turn.phase("attestation", "done")["verdicts"] == {"prod-eu-1": "unattestable"}
+        assert turn.phase("attestation", "done")["verdicts"] == {UNREACHABLE: "unattestable"}
         signals = " ".join(report["clusters"][0]["signals"]).lower()
-        assert "watchdog" in signals or "monitoring" in signals
+        assert "did not respond" in signals
 
         grounding = turn.grounding()
-        assert "CONFIDENCE CAP for prod-eu-1" in grounding
+        assert f"CONFIDENCE CAP for {UNREACHABLE}" in grounding
         assert "assert no cluster-level conclusion" in grounding
 
 
@@ -278,7 +288,7 @@ class TestNarrativeDegrade:
     @pytest.mark.asyncio
     async def test_other_narrative_failures_are_classified_separately(self, conversation):
         convo = conversation(StubAnalyst(name="analyst", fail_with="generic"))
-        turn = await convo.say("attest prod-east-2")
+        turn = await convo.say(f"attest {DEGRADED}")
         assert turn.of("error")[0]["reason"] == "narrative_failed"
 
     def test_connection_error_classification(self):
@@ -301,24 +311,24 @@ class TestScopeChangeInvalidation:
     async def test_environment_switch_reattests_and_rebuilds_app360(self, conversation):
         convo = conversation()
         first = await convo.say("why is payments-api flaky in prod?")
-        assert {c["cluster"] for c in first.of("app360")} == {"prod-east-1", "prod-east-2"}
+        assert {c["cluster"] for c in first.of("app360")} == {HEALTHY}
 
         second = await convo.say("switch to nonprod")
         assert second.of("context")[0]["environment"] == "nonprod"
-        assert second.phase("attestation", "start")["clusters"] == ["nonprod-east-1"]
-        assert [c["cluster"] for c in second.of("app360")] == ["nonprod-east-1"]
+        assert second.phase("attestation", "start")["clusters"] == [DEGRADED]
+        assert [c["cluster"] for c in second.of("app360")] == [DEGRADED]
         # The prod report must not linger in the grounding for the new scope.
         grounded = json.loads(second.grounding())
         assert [a["instance"] for a in grounded["app360"]] == [
-            "payments-dev @ nonprod-east-1 (nonprod)"
+            f"{APP_NS} @ {DEGRADED} (nonprod)"
         ]
-        assert set(grounded["attestation"]) == {"nonprod-east-1"}
+        assert set(grounded["attestation"]) == {DEGRADED}
 
     @pytest.mark.asyncio
     async def test_cluster_scope_switch_drops_the_stale_app360(self, conversation):
         convo = conversation()
         await convo.say("why is payments-api flaky in prod?")
-        turn = await convo.say("attest prod-eu-1")
+        turn = await convo.say(f"attest {UNREACHABLE}")
 
         assert turn.of("context")[0]["scope"] == "cluster"
         assert turn.of("app360") == []

@@ -37,6 +37,41 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO_ROOT / "config"
 
 
+def config_dir_with_registry(tmp_path: Path, registry_port: int) -> Path:
+    """A copy of the committed config plane with the registry MCP registered.
+
+    The E2E harness serves a FakeRegistry-backed MCP server on a kernel-
+    assigned port, and the gateway learns about downstreams only from
+    config/gateway/servers.yaml. Copying the whole plane keeps every other
+    file (batteries, prompts, fleet, applications) exactly the committed one,
+    so the test still exercises the shipped configuration.
+    """
+    import shutil
+
+    import yaml
+
+    root = tmp_path / "config"
+    shutil.copytree(CONFIG_DIR, root)
+    servers_path = root / "gateway" / "servers.yaml"
+    servers = yaml.safe_load(servers_path.read_text())
+    entry = next((s for s in servers["servers"] if s["prefix"] == "reg"), None)
+    if entry is None:
+        entry = {"prefix": "reg", "name": "Registry MCP", "enabled": True,
+                 "timeout_seconds": 30,
+                 "allow_tools": list(_REGISTRY_TOOLS)}
+        servers["servers"].append(entry)
+    entry["url"] = f"http://127.0.0.1:{registry_port}/mcp"
+    servers_path.write_text(yaml.safe_dump(servers, sort_keys=False))
+    return root
+
+
+# Imported lazily by name to keep harness.py free of a fakes.py import cycle.
+_REGISTRY_TOOLS = (
+    "resolve_entity", "find_placements", "list_apps_on_cluster",
+    "blast_radius", "get_app", "list_lobs",
+)
+
+
 def free_port() -> int:
     """A port the kernel just handed out, so tests never touch 8001/8010-8012."""
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
