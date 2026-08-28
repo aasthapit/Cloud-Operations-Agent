@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 from conftest import CONFIG_DIR
+from registry_fixtures import seeded_registry  # noqa: F401 - fixture import
 
 from cloudops.agent.checks import derive_verdict, evaluate_check
 from cloudops.agent.models import AttestationBattery, ClusterVerdict
@@ -34,6 +35,12 @@ from cloudops.mcp_servers.openshift.live import (
 )
 
 CLUSTER = "acm-spoke-1a"
+
+# LiveFleet reads its cluster records from MongoDB now, so every test in this
+# module needs the seeded in-memory registry standing behind it. Autouse
+# rather than per-test, because the dependency is the module's baseline
+# rather than the subject of any one test.
+pytestmark = pytest.mark.usefixtures("seeded_registry")
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +263,7 @@ def test_registry_entry_hides_mock_placement_hints() -> None:
     entry = LiveFleet().get_app_registry_entry("payments-api")
     assert entry["found"] is True
     assert "instances" not in entry
+    assert "live_placements" not in entry
 
 
 def test_app_label_matches_what_live_prep_deploys() -> None:
