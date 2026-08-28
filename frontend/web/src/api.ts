@@ -14,7 +14,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
     placeholder: "Ask a question…",
     emptyStateProse:
       "Ask about an application or a cluster; I attest platform health before every answer.",
-    emptyStateExamples: ["Why is payments-api flaky in prod?", "attest prod-east-2"],
+    emptyStateExamples: ["Why is payments-api flaky in prod?", "attest acm-spoke-2a"],
   },
 };
 

@@ -189,6 +189,32 @@ export function Chat(props: {
       props.onSelectPersona(personaArg);
       return;
     }
+    // A command typed out by hand gets the same treatment the palette gives
+    // it: /attest becomes the agent's "attest <cluster>" phrasing, and a
+    // message command's template is dropped in for review. The agent never
+    // sees a raw "/..." string.
+    const attestArg = splitCommand(trimmed, "/attest");
+    if (attestArg !== null) {
+      setPaletteOpen(false);
+      if (attestArg) {
+        setDraft("");
+        props.onSend(`attest ${attestArg}`);
+      } else {
+        setDraft("attest <cluster> ");
+        inputRef.current?.focus();
+      }
+      return;
+    }
+    const typedName = trimmed.split(/\s+/)[0].toLowerCase();
+    const typedCommand = trimmed.startsWith("/")
+      ? props.commands.find((c) => c.name === typedName)
+      : undefined;
+    if (typedCommand) {
+      setPaletteOpen(false);
+      setDraft(typedCommand.template ? `${typedCommand.template} ` : `${typedCommand.description} `);
+      inputRef.current?.focus();
+      return;
+    }
     setDraft("");
     setPaletteOpen(false);
     props.onSend(trimmed);
@@ -242,7 +268,16 @@ export function Chat(props: {
   };
 
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!paletteOpen || paletteItems.length === 0) return;
+    if (!paletteOpen || paletteItems.length === 0) {
+      // Submit on Enter explicitly rather than trusting implicit form
+      // submission, which some environments (and synthesized key events)
+      // never fire.
+      if (e.key === "Enter") {
+        e.preventDefault();
+        send(draft);
+      }
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setPaletteIndex((i) => (i + 1) % paletteItems.length);

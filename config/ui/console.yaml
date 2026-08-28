@@ -18,4 +18,4 @@ composer:
   emptyStateProse: "Ask about an application or a cluster; I attest platform health before every answer."
   emptyStateExamples:
     - "Why is payments-api flaky in prod?"
-    - "attest prod-east-2"
+    - "attest acm-spoke-2a"
