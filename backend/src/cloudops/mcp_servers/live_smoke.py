@@ -86,19 +86,20 @@ class Table:
 
 
 def _registry() -> Any:
-    """The registry data-access lib, or Skipped when it cannot be used.
+    """The registry query module, or Skipped when it cannot be used.
 
-    Imported lazily and by name so this module keeps running on a checkout
-    where the registry package has not landed yet.
+    Imported lazily so a Mongo that is down turns these probes into skips
+    rather than sinking a smoke run that is really about the clusters.
     """
     try:
-        from cloudops.registry import Registry  # type: ignore[attr-defined]
+        from cloudops.registry import queries
     except ImportError as exc:
         raise Skipped(f"registry lib unavailable ({exc})") from exc
     try:
-        return Registry()
+        queries.list_lobs()
     except Exception as exc:  # noqa: BLE001 - Mongo down is a skip, not a failure
         raise Skipped(f"registry unreachable ({type(exc).__name__})") from exc
+    return queries
 
 
 def main() -> int:

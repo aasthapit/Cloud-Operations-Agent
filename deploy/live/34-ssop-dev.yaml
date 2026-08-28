@@ -1,0 +1,38 @@
+# ssop, nonprod variant. Applied to the ring-2 hub so SSOP spans two
+# environments and the environment-scoping path (FR-CTX-8) has a real case.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ssop-dev
+  labels:
+    app.kubernetes.io/part-of: cloudops-live-fleet
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ssop
+  namespace: ssop-dev
+  labels:
+    app: ssop
+    app.kubernetes.io/name: ssop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssop
+  template:
+    metadata:
+      labels:
+        app: ssop
+        app.kubernetes.io/name: ssop
+    spec:
+      containers:
+        - name: ssop
+          image: busybox:1.36
+          command: [sh, -c, "echo ssop up; sleep 2147483647"]
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: 100m, memory: 64Mi }

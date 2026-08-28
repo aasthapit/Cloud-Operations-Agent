@@ -37,10 +37,12 @@ render_prometheus() {
   printf '%s' "$rendered" | sed "s/__CONFIG_HASH__/$hash/g"
 }
 
-# Which demo workloads belong on which cluster. Placement is DISCOVERED at
-# runtime from kube_pod_labels; this map is only what live-prep deploys.
+# Which demo workloads belong on which cluster. Placement is VERIFIED at
+# runtime against the cluster API; this map is only what live-prep deploys.
 demo_manifests() {
   case "$CLUSTER" in
+    acm-hub-1)    echo "$DIR/33-ssop-prod.yaml" ;;
+    acm-hub-2)    echo "$DIR/34-ssop-dev.yaml" ;;
     acm-spoke-1a) echo "$DIR/30-payments-prod-healthy.yaml" ;;
     acm-spoke-2a) echo "$DIR/31-payments-prod-degraded.yaml" ;;
     acm-spoke-1b) echo "$DIR/32-logistics-dev.yaml" ;;

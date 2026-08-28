@@ -32,7 +32,11 @@ live-smoke:  ## exercise the live backend against the running kind fleet (binds 
 	cd backend && uv run python -m cloudops.mcp_servers.live_smoke
 
 mongo-up:  ## start the fleet registry's MongoDB on 127.0.0.1:27017
-	cd deploy/mongo && docker compose up -d
+	@if nc -z 127.0.0.1 27017 2>/dev/null; then \
+		echo "MongoDB already listening on 127.0.0.1:27017; nothing to do"; \
+	else \
+		cd deploy/mongo && docker compose up -d; \
+	fi
 
 mongo-down:  ## stop MongoDB (the named volume, and so the seeded data, survives)
 	cd deploy/mongo && docker compose down

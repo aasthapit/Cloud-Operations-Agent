@@ -1,0 +1,40 @@
+# ssop, the self-service operations portal (app_id SSOP in the registry).
+# Applied to the ring-1 hub so "is app SSOP down?" exercises the whole chain:
+# resolve_entity("SSOP") -> registry placements -> live verification against
+# a workload that really runs.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ssop-prod
+  labels:
+    app.kubernetes.io/part-of: cloudops-live-fleet
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ssop
+  namespace: ssop-prod
+  labels:
+    app: ssop
+    app.kubernetes.io/name: ssop
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ssop
+  template:
+    metadata:
+      labels:
+        app: ssop
+        app.kubernetes.io/name: ssop
+    spec:
+      containers:
+        - name: ssop
+          image: busybox:1.36
+          command: [sh, -c, "echo ssop up; sleep 2147483647"]
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: 100m, memory: 64Mi }
