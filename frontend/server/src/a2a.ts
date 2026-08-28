@@ -29,23 +29,30 @@ export interface A2AStreamEvent {
   contextId?: string;
   state?: string;
   texts: string[];
+  /** Reasoning-model thought parts (ADK's `adk_thought` marker): internal
+   * deliberation, kept separate from narrative texts so the BFF can forward
+   * them as their own SSE event instead of dropping them. */
+  thoughts: string[];
 }
 
 /** Pull contextId/taskId/state/text parts out of one result envelope. */
 function normalizeResult(result: Record<string, unknown>): A2AStreamEvent | null {
-  const partTexts = (parts: unknown): string[] =>
+  type Part = { text?: string; metadata?: Record<string, unknown> };
+  const isThought = (p: Part): boolean => Boolean(p.metadata?.adk_thought);
+  const partsOf = (parts: unknown): Part[] =>
     Array.isArray(parts)
-      ? parts
-          .map((p) => {
-            if (!p || typeof p !== "object") return "";
-            const part = p as { text?: string; metadata?: Record<string, unknown> };
-            // Reasoning-model thought parts are marked by ADK's converter;
-            // they are internal deliberation, never user-facing narrative.
-            if (part.metadata?.adk_thought) return "";
-            return String(part.text ?? "");
-          })
-          .filter(Boolean)
+      ? parts.filter((p): p is Part => Boolean(p && typeof p === "object"))
       : [];
+  const partTexts = (parts: unknown): string[] =>
+    partsOf(parts)
+      .filter((p) => !isThought(p))
+      .map((p) => String(p.text ?? ""))
+      .filter(Boolean);
+  const partThoughts = (parts: unknown): string[] =>
+    partsOf(parts)
+      .filter((p) => isThought(p))
+      .map((p) => String(p.text ?? ""))
+      .filter(Boolean);
 
   if (result.task && typeof result.task === "object") {
     const task = result.task as Record<string, unknown>;
@@ -55,6 +62,7 @@ function normalizeResult(result: Record<string, unknown>): A2AStreamEvent | null
       contextId: task.contextId as string,
       state: (task.status as Record<string, unknown> | undefined)?.state as string,
       texts: [],
+      thoughts: [],
     };
   }
   if (result.statusUpdate && typeof result.statusUpdate === "object") {
@@ -67,6 +75,7 @@ function normalizeResult(result: Record<string, unknown>): A2AStreamEvent | null
       contextId: u.contextId as string,
       state: status.state as string,
       texts: partTexts(message.parts),
+      thoughts: partThoughts(message.parts),
     };
   }
   if (result.artifactUpdate && typeof result.artifactUpdate === "object") {
@@ -77,11 +86,17 @@ function normalizeResult(result: Record<string, unknown>): A2AStreamEvent | null
       taskId: u.taskId as string,
       contextId: u.contextId as string,
       texts: partTexts(artifact.parts),
+      thoughts: partThoughts(artifact.parts),
     };
   }
   if (result.message && typeof result.message === "object") {
     const m = result.message as Record<string, unknown>;
-    return { kind: "message", contextId: m.contextId as string, texts: partTexts(m.parts) };
+    return {
+      kind: "message",
+      contextId: m.contextId as string,
+      texts: partTexts(m.parts),
+      thoughts: partThoughts(m.parts),
+    };
   }
   return null;
 }
