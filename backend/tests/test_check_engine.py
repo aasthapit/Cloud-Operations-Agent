@@ -1,7 +1,8 @@
 """Check engine unit tests: rule evaluation, verdict derivation, status maps."""
 
 import pytest
-from conftest import CONFIG_DIR, WorldGateway
+from conftest import CONFIG_DIR
+from fakes import DEGRADED, HEALTHY, UNREACHABLE, node
 
 from cloudops.agent.checks import (
     _lookup,
@@ -170,10 +171,11 @@ class TestAttestationDelta:
 
     def test_new_signal_without_a_verdict_flip_still_reports(self):
         previous = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators"])
-        current = attestation("prod-east-2", ClusterVerdict.DEGRADED, ["cluster-operators", "etcd"])
+        current = attestation("prod-east-2", ClusterVerdict.DEGRADED,
+                              ["cluster-operators", "capacity"])
         delta = attestation_delta(previous, current)
         assert delta is not None
-        assert delta.note == "new: etcd"
+        assert delta.note == "new: capacity"
 
 
 @pytest.fixture(scope="session")
@@ -183,26 +185,62 @@ def battery() -> AttestationBattery:
     )
 
 
-class TestAttestationAgainstTheMockWorld:
-    """G3 / FR-ATT-5: the battery, run for real against the scenario faults."""
+class TestAttestationAgainstTheFleet:
+    """G3 / FR-ATT-5: the committed battery, run for real through the check
+    engine against canned cluster APIs. These are the verdicts the agent
+    reaches, not a restatement of the rules."""
 
     @pytest.mark.asyncio
-    async def test_watchdog_absent_cluster_is_unattestable(self, battery, world):
-        """prod-eu-1 has no Watchdog in config/mock/scenario.yaml: monitoring
-        cannot be trusted, so the verdict is unattestable, never healthy."""
-        [att] = await run_attestation(battery, ["prod-eu-1"], WorldGateway(world), "v1")
+    async def test_healthy_cluster_attests_healthy(self, battery, gateway):
+        [att] = await run_attestation(battery, [HEALTHY], gateway, "v1")
+        assert att.verdict is ClusterVerdict.HEALTHY
+        assert att.signals == []
+        # The four OpenShift-only tools land as plain passes on vanilla
+        # Kubernetes rather than dragging the verdict down (the n/a contract).
+        statuses = {c.id: c.status for c in att.checks}
+        for check_id in ("cluster-version", "cluster-operators",
+                         "machine-config-pools", "pending-csrs"):
+            assert statuses[check_id] is CheckStatus.PASS, check_id
+
+    @pytest.mark.asyncio
+    async def test_not_ready_node_degrades_the_cluster(self, battery, gateway):
+        [att] = await run_attestation(battery, [DEGRADED], gateway, "v1")
+        assert att.verdict is ClusterVerdict.DEGRADED
+        assert any("NotReady" in s for s in att.signals)
+
+    @pytest.mark.asyncio
+    async def test_cordoned_node_is_maintenance_not_damage(self, battery, gateway):
+        [att] = await run_attestation(battery, ["acm-spoke-1b"], gateway, "v1")
+        assert att.verdict is ClusterVerdict.MAINTENANCE
+
+    @pytest.mark.asyncio
+    async def test_unreachable_cluster_is_unattestable(self, battery, gateway):
+        """The battery's only unattestable outcome after the Prometheus checks
+        were removed: a cluster that did not answer was not attested, and must
+        not be reported as degraded (which would claim knowledge) either."""
+        [att] = await run_attestation(battery, [UNREACHABLE], gateway, "v1")
         assert att.verdict is ClusterVerdict.UNATTESTABLE
-        assert any(c.id == "watchdog-present" and c.status == CheckStatus.UNATTESTABLE
+        assert any(c.id == "api-reachability" and c.status is CheckStatus.UNATTESTABLE
                    for c in att.checks)
-        assert any("watchdog" in s.lower() or "monitoring" in s.lower() for s in att.signals)
 
     @pytest.mark.asyncio
-    async def test_degraded_and_healthy_clusters_still_separate(self, battery, world):
-        gateway = WorldGateway(world)
+    async def test_verdicts_stay_separate_across_clusters(self, battery, gateway):
         results = {a.cluster: a for a in
-                   await run_attestation(battery, ["prod-east-2", "prod-east-1"], gateway, "v1")}
-        assert results["prod-east-2"].verdict is ClusterVerdict.DEGRADED
-        assert results["prod-east-1"].verdict is ClusterVerdict.HEALTHY
+                   await run_attestation(battery, [DEGRADED, HEALTHY], gateway, "v1")}
+        assert results[DEGRADED].verdict is ClusterVerdict.DEGRADED
+        assert results[HEALTHY].verdict is ClusterVerdict.HEALTHY
+
+    @pytest.mark.asyncio
+    async def test_capacity_check_reads_real_requests(self, battery, gateway, world):
+        """The capacity check now computes from nodes and pods, so shrinking
+        the cluster to one node must trip the minus-one-node guard."""
+        world[HEALTHY].nodes = [node("cp-1")]
+        [att] = await run_attestation(battery, [HEALTHY], gateway, "v1")
+        capacity = next(c for c in att.checks if c.id == "capacity")
+        assert capacity.status is CheckStatus.WARN
+        assert "single-node cluster" in capacity.observed
+        # A warning-severity failure informs without flipping the verdict.
+        assert att.verdict is ClusterVerdict.HEALTHY
 
 
 class TestReportStatus:

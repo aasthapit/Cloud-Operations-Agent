@@ -1,14 +1,13 @@
-"""Live OpenShift backend: real cluster state over the Kubernetes API.
+"""OpenShift backend: real cluster state over the Kubernetes API.
 
-Design contract: method names and RESULT SHAPES are identical to
-cloudops.mockfleet.World (decision D6). The check batteries in
-config/checks/*.yaml address these fields by dotted path and cannot tell
-which backend answered.
+Design contract: RESULT SHAPES are the contract. The check batteries in
+config/checks/*.yaml address these fields by dotted path, so a shape change
+here is a battery change there.
 
 Vanilla Kubernetes contract. The reference live fleet is kind, not OpenShift,
 so ClusterVersion, ClusterOperator, MachineConfigPool and the OpenShift
 node-approver CSR semantics simply do not exist there. Those four tools do
-NOT error: they return the mock shape with health-neutral values plus
+NOT error: they return the full result shape with health-neutral values plus
 ``applicable: false`` and a reason (cloudops.mcp_servers.kube.not_applicable),
 so the attestation battery's rules never trigger, the checks land as plain
 passes, and the cluster verdict stays honest instead of going degraded or
@@ -94,6 +93,30 @@ def _split_image(image: str) -> tuple[str, str]:
     if not sep or "/" in tag:  # no tag, just a registry port or a bare repo
         return image, "latest"
     return repo, tag
+
+
+def _labels_name(metadata: dict[str, Any]) -> str | None:
+    """The fleet's app identity label on any object, with the pre-convention
+    `app` label as a fallback."""
+    labels = metadata.get("labels") or {}
+    name = labels.get("app.kubernetes.io/name") or labels.get("app")
+    return str(name) if name is not None else None
+
+
+def _prefer_matching(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
+    """Rows whose labels name the app, or all of them when none do.
+
+    The second element says which happened, so the caller can label the
+    rollup as app-scoped or namespace-scoped instead of overclaiming.
+    """
+    matching = [r for r in rows if r["app_match"]]
+    return (matching, True) if matching else (rows, False)
+
+
+def _scope_summary(text: str, present: bool, exact: bool) -> str:
+    if not present or exact:
+        return text
+    return text + " (namespace-wide; no object labelled for this app)"
 
 
 class LiveOpenShiftBackend:
@@ -239,8 +262,7 @@ class LiveOpenShiftBackend:
         }
 
     def get_namespaces(self, cluster: str) -> dict[str, Any]:
-        """Namespace inventory. No MCP tool exposes this yet; live-smoke and
-        manual investigation both want it, and context resolution will."""
+        """Namespace inventory: what exists on this cluster to look inside."""
         items = self._client(cluster).items("/api/v1/namespaces")
         return {
             "cluster": cluster,
@@ -253,7 +275,201 @@ class LiveOpenShiftBackend:
             ],
         }
 
+    def get_capacity(self, cluster: str) -> dict[str, Any]:
+        """Requests versus allocatable across the cluster, from the Kubernetes
+        API alone.
+
+        Requests are summed over the CONTAINERS of non-terminal pods (Succeeded
+        and Failed pods hold no reservation), allocatable over node status. That
+        is the same arithmetic the scheduler does, so the answer is a fact about
+        the cluster rather than a metrics-pipeline reading; the result keys
+        mirror the retired Prometheus capacity summary so the attestation rule
+        is unchanged apart from the tool name.
+        """
+        client = self._client(cluster)
+        nodes = client.items("/api/v1/nodes")
+        cpu_alloc = mem_alloc = pod_capacity = 0.0
+        biggest_node = 0.0
+        for node in nodes:
+            allocatable = node.get("status", {}).get("allocatable") or {}
+            node_cpu = _parse_quantity(allocatable.get("cpu", 0))
+            cpu_alloc += node_cpu
+            mem_alloc += _parse_quantity(allocatable.get("memory", 0))
+            pod_capacity += _parse_quantity(allocatable.get("pods", 0))
+            biggest_node = max(biggest_node, node_cpu)
+
+        pods = client.items("/api/v1/pods", fieldSelector="status.phase!=Succeeded")
+        live_pods = [p for p in pods if p.get("status", {}).get("phase") != "Failed"]
+        cpu_req = mem_req = 0.0
+        for pod in live_pods:
+            spec = pod.get("spec", {})
+            for container in list(spec.get("containers") or []):
+                requests = (container.get("resources") or {}).get("requests") or {}
+                cpu_req += _parse_quantity(requests.get("cpu", 0))
+                mem_req += _parse_quantity(requests.get("memory", 0))
+
+        cpu_ratio = round(cpu_req / cpu_alloc, 4) if cpu_alloc else None
+        mem_ratio = round(mem_req / mem_alloc, 4) if mem_alloc else None
+        pod_count = len(live_pods)
+        pod_ratio = round(pod_count / pod_capacity, 4) if pod_capacity else None
+        # The minus-one-node guard asks whether requests still fit after losing
+        # the largest node. On a single-node cluster the answer is genuinely
+        # no; reporting True there would be a comfortable lie.
+        fits = (cpu_alloc - biggest_node) >= cpu_req if nodes else None
+        summary = (
+            f"cpu req {int((cpu_ratio or 0) * 100)}%, mem req {int((mem_ratio or 0) * 100)}% "
+            f"of allocatable across {len(nodes)} node(s)"
+        )
+        if len(nodes) <= 1:
+            summary += "; single-node cluster, so the minus-one-node guard cannot pass"
+        return {
+            "cluster": cluster,
+            "nodes": len(nodes),
+            "cpu_requests_cores": round(cpu_req, 3),
+            "cpu_allocatable_cores": round(cpu_alloc, 3),
+            "cpu_requests_ratio": cpu_ratio,
+            "memory_requests_mi": round(mem_req / 1024**2),
+            "memory_allocatable_mi": round(mem_alloc / 1024**2),
+            "memory_requests_ratio": mem_ratio,
+            "pod_count": pod_count,
+            "pod_capacity": int(pod_capacity),
+            "pod_ratio": pod_ratio,
+            "fits_minus_one_node": fits,
+            "summary": summary,
+        }
+
     # -- namespace / application state ---------------------------------------
+
+    def verify_placement(self, cluster: str, namespace: str, app_label: str) -> dict[str, Any]:
+        """Does this app actually run here? The registry proposes, the cluster
+        API confirms (FR-CTX-2).
+
+        Never raises. An unreachable cluster, a namespace that does not exist
+        and a namespace with no matching pods are three different honest
+        answers, and context resolution has to tell them apart rather than
+        lose the whole turn to one bad candidate.
+        """
+        result: dict[str, Any] = {
+            "cluster": cluster, "namespace": namespace, "app_label": app_label,
+            "reachable": True, "pod_count": 0, "ready_count": 0, "verified": False,
+        }
+        try:
+            client = self._client(cluster)
+            selector = self._selector(client, namespace, app_label)
+            pods = client.items(
+                f"/api/v1/namespaces/{namespace}/pods", labelSelector=selector)
+        except httpx.HTTPStatusError as exc:
+            # The API server ANSWERED - a missing namespace, or a forbidden
+            # one. That is "the app is not there", not "the cluster is down",
+            # and context resolution treats those two very differently.
+            result["reason"] = f"HTTP {exc.response.status_code} for namespace {namespace}"
+            return result
+        except Exception as exc:  # noqa: BLE001 - unreachable IS the reading here
+            result["reachable"] = False
+            result["reason"] = f"{type(exc).__name__}: {exc}"[:200]
+            return result
+        ready = 0
+        for pod in pods:
+            statuses = list(pod.get("status", {}).get("containerStatuses") or [])
+            if statuses and all(c.get("ready") for c in statuses):
+                ready += 1
+        result["pod_count"] = len(pods)
+        result["ready_count"] = ready
+        result["verified"] = len(pods) > 0
+        return result
+
+    def get_autoscaling(self, cluster: str, namespace: str, app_label: str) -> dict[str, Any]:
+        """HorizontalPodAutoscalers (autoscaling/v2) and PodDisruptionBudgets
+        (policy/v1) for a namespace.
+
+        Neither object carries the app label reliably, so the namespace is
+        listed in full and each row is marked ``app_match`` when its own labels,
+        its scale target, or its pod selector names the app. The rolled-up
+        ``hpa``/``pdb`` blocks prefer matching rows and fall back to the whole
+        namespace, saying which happened in the summary rather than pretending
+        the filter was exact.
+        """
+        client = self._client(cluster)
+        hpas: list[dict[str, Any]] = []
+        for item in client.items(
+            f"/apis/autoscaling/v2/namespaces/{namespace}/horizontalpodautoscalers"
+        ):
+            meta, spec, status = item["metadata"], item.get("spec", {}), item.get("status", {})
+            target = str((spec.get("scaleTargetRef") or {}).get("name", ""))
+            minimum = spec.get("minReplicas")
+            maximum = spec.get("maxReplicas")
+            current = status.get("currentReplicas")
+            desired = status.get("desiredReplicas")
+            at_max = bool(current is not None and maximum is not None and current >= maximum)
+            hpas.append({
+                "name": meta["name"],
+                "target": target,
+                "app_match": _labels_name(meta) == app_label or target == app_label,
+                "min": int(minimum) if minimum is not None else None,
+                "max": int(maximum) if maximum is not None else None,
+                "current": int(current) if current is not None else None,
+                "desired": int(desired) if desired is not None else None,
+                "at_max": at_max,
+                "min_eq_max": bool(minimum is not None and minimum == maximum),
+                # KubeHpaMaxedOut excludes min==max: a fixed-size HPA is a
+                # deployment with extra steps, not an autoscaler out of room.
+                "maxed": at_max and minimum != maximum,
+            })
+
+        pdbs: list[dict[str, Any]] = []
+        for item in client.items(
+            f"/apis/policy/v1/namespaces/{namespace}/poddisruptionbudgets"
+        ):
+            meta, spec, status = item["metadata"], item.get("spec", {}), item.get("status", {})
+            match_labels = (spec.get("selector") or {}).get("matchLabels") or {}
+            allowed = status.get("disruptionsAllowed")
+            pdbs.append({
+                "name": meta["name"],
+                "app_match": app_label in (
+                    match_labels.get("app.kubernetes.io/name"), match_labels.get("app"),
+                    _labels_name(meta),
+                ),
+                "disruptions_allowed": int(allowed) if allowed is not None else None,
+                "expected_pods": int(status.get("expectedPods", 0)),
+                "current_healthy": int(status.get("currentHealthy", 0)),
+                "desired_healthy": int(status.get("desiredHealthy", 0)),
+                "blocked": bool(allowed is not None and allowed == 0),
+            })
+
+        hpa_rows, hpa_exact = _prefer_matching(hpas)
+        pdb_rows, pdb_exact = _prefer_matching(pdbs)
+        hpa = {
+            "present": bool(hpa_rows),
+            "min": hpa_rows[0]["min"] if hpa_rows else None,
+            "max": hpa_rows[0]["max"] if hpa_rows else None,
+            "current": hpa_rows[0]["current"] if hpa_rows else None,
+            "desired": hpa_rows[0]["desired"] if hpa_rows else None,
+            "at_max": any(h["at_max"] for h in hpa_rows),
+            "min_eq_max": all(h["min_eq_max"] for h in hpa_rows) if hpa_rows else False,
+            "maxed_out": any(h["maxed"] for h in hpa_rows),
+        }
+        allowed_values = [p["disruptions_allowed"] for p in pdb_rows
+                          if p["disruptions_allowed"] is not None]
+        pdb = {
+            "present": bool(pdb_rows),
+            "disruptions_allowed": min(allowed_values) if allowed_values else None,
+            "expected_pods": max((p["expected_pods"] for p in pdb_rows), default=0),
+            "blocked": any(p["blocked"] for p in pdb_rows),
+        }
+        return {
+            "cluster": cluster, "namespace": namespace, "app_label": app_label,
+            "hpas": hpas, "pdbs": pdbs,
+            "hpa": hpa, "pdb": pdb,
+            "hpa_summary": _scope_summary(
+                f"HPA {hpa['current']}/{hpa['max']} replicas" if hpa["present"] else "no HPA",
+                bool(hpa_rows), hpa_exact,
+            ),
+            "pdb_summary": _scope_summary(
+                f"{pdb['disruptions_allowed']} disruption(s) allowed"
+                if pdb["present"] else "no PodDisruptionBudget",
+                bool(pdb_rows), pdb_exact,
+            ),
+        }
 
     def _selector(self, client: KubeClient, namespace: str, app_label: str) -> str:
         """app.kubernetes.io/name is the fleet convention; fall back to the
@@ -405,8 +621,7 @@ class LiveOpenShiftBackend:
             "oomkilled_recent": oomkilled,
             "restarts_last_hour": restarts_recent,
             "probes_failing": probes_failing,
-            # Additive detail: the mock world carries no per-container view,
-            # and the live one is worth keeping for the evidence trail.
+            # Per-container detail: the evidence trail the analyst narrates from.
             "container_issues": issues[:20],
         }
 
@@ -519,8 +734,8 @@ class LiveOpenShiftBackend:
                 "status": pvc.get("status", {}).get("phase"),
                 "storage_class": pvc.get("spec", {}).get("storageClassName"),
                 "capacity_gb": round(_parse_quantity(capacity) / 1024**3, 1),
-                # Volume fill needs kubelet volume stats; metrics belong to the
-                # observability backend, so this stays honestly unknown here.
+                # Volume fill needs kubelet volume stats, which this deployment
+                # does not collect, so it stays honestly unknown.
                 "used_ratio": None,
                 "growth_trend": "unknown",
             })

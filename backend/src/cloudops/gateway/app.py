@@ -42,7 +42,7 @@ from starlette.applications import Starlette
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 
-from cloudops.common.config import HotConfig
+from cloudops.common.config import HotConfig, load_yaml
 from cloudops.common.redact import redact_obj
 from cloudops.common.settings import get_settings
 from cloudops.common.telemetry import extract_context, inject_headers
@@ -57,13 +57,33 @@ _request_thread: contextvars.ContextVar[str] = contextvars.ContextVar("thread_id
 _request_user: contextvars.ContextVar[str] = contextvars.ContextVar("user_sub", default="-")
 
 
+# Last-resort cadence if config/gateway/gateway.yaml is absent or silent.
+_FALLBACK_RECONNECT_DELAY_S = 2.0
+
+
+def gateway_tuning() -> dict[str, Any]:
+    """Boot-time gateway behavior from config/gateway/gateway.yaml.
+
+    Deliberately NOT hot-reloaded: these values are captured by supervisor
+    loops that outlive a single request, so a mid-flight change would apply
+    to some downstreams and not others. servers.yaml stays the hot half.
+    """
+    path = get_settings().config_dir / "gateway" / "gateway.yaml"
+    try:
+        return dict(load_yaml(path) or {})
+    except OSError as exc:
+        log.warning("gateway.tuning_unreadable", file=str(path), error=str(exc)[:200])
+        return {}
+
+
 class Downstream:
     """A supervised connection to one downstream MCP server."""
 
-    RECONNECT_DELAY_S = 2.0
-
     def __init__(self, entry: ServerEntry, on_catalog: Any) -> None:
         self.entry = entry
+        self.reconnect_delay_s = float(
+            gateway_tuning().get("reconnect_delay_seconds", _FALLBACK_RECONNECT_DELAY_S)
+        )
         self._on_catalog = on_catalog  # callback(prefix, list[types.Tool] | None)
         self.session: ClientSession | None = None
         self._task: asyncio.Task[None] | None = None
@@ -106,10 +126,10 @@ class Downstream:
                 await self._on_catalog(self.entry.prefix, None)
                 log.warning(
                     "downstream.disconnected", prefix=self.entry.prefix,
-                    error=str(exc)[:300], retry_in_s=self.RECONNECT_DELAY_S,
+                    error=str(exc)[:300], retry_in_s=self.reconnect_delay_s,
                 )
                 try:
-                    await asyncio.wait_for(self._stop.wait(), timeout=self.RECONNECT_DELAY_S)
+                    await asyncio.wait_for(self._stop.wait(), timeout=self.reconnect_delay_s)
                 except TimeoutError:
                     continue
         self.session = None

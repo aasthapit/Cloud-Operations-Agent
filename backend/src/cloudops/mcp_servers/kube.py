@@ -66,7 +66,7 @@ def not_applicable(**neutral: Any) -> dict[str, Any]:
     """An OpenShift-only tool result for a cluster that has no such API.
 
     The contract (see README, 'Live mode against a local kind fleet'): the
-    result keeps the mock shape with health-neutral values, so no attestation
+    result keeps the full result shape with health-neutral values, so no attestation
     rule triggers and the check lands as a plain pass, and carries
     ``applicable: false`` plus a reason so a reader (or a future battery rule)
     can tell "nothing to report" apart from "everything is fine".

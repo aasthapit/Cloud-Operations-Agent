@@ -7,8 +7,16 @@ resolve() every turn and acts on the outcome:
   Clarify      exactly one question with enumerated options (FR-CTX-4)
   Resolved     application + verified placements, or explicit cluster scope
 
-Placement is ALWAYS verified through obs__find_app_placements (Prometheus
-series in live mode), never assumed from the registry (FR-CTX-2).
+Placement is a two-step contract (FR-CTX-2): the fleet registry PROPOSES
+candidates through reg__find_placements, and every candidate is then
+CONFIRMED against the cluster itself through ocp__verify_placement. A
+registry row nothing backs never reaches the report.
+
+Ordering note: the environment is scoped from the REGISTRY's candidate list,
+before verification, because the registry is what knows an application spans
+prod and nonprod - a prod cluster that happens to be down must not silently
+turn a two-environment application into a one-environment one. Verification
+then narrows within the chosen environment.
 
 Application ambiguity always asks; environment ambiguity does not have to.
 FR-CTX-8 gives the environment a configured default (policy["default_environment"],
@@ -20,6 +28,7 @@ user's one question on it. Setting the policy to None restores strict asking.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -27,7 +36,9 @@ from typing import Any
 import structlog
 
 from cloudops.agent.gateway_client import GatewayClient
+from cloudops.agent.messages import message
 from cloudops.agent.models import AppInstance, ResolvedContext
+from cloudops.common.settings import get_settings
 
 log = structlog.get_logger("cloudops.context")
 
@@ -133,6 +144,46 @@ def _pick_option(text: str, options: list[str]) -> str | None:
     return matches[0] if len(matches) == 1 else None
 
 
+async def _registry_candidates(
+    client: GatewayClient, application: str, app_label: str
+) -> list[dict[str, Any]]:
+    """Placement candidates from the fleet registry.
+
+    The registry keys placements on app_id, and a fleet's app_id is not always
+    its display name; the app label is the other identifier the org actually
+    uses. Ask by name first, then by label, and stop at the first answer rather
+    than merging two possibly-different applications into one report.
+    """
+    for candidate in [application, app_label]:
+        if not candidate:
+            continue
+        result = await client.call("reg__find_placements", {"app_id": candidate})
+        placements = [p for p in result.get("placements", []) if p.get("cluster")]
+        if placements:
+            return placements
+        if candidate == app_label:
+            break
+    return []
+
+
+def _candidate_list(placements: list[dict[str, Any]]) -> str:
+    return ", ".join(f"{p['cluster']}/{p['namespace']}" for p in placements)
+
+
+def _verification_detail(
+    placements: list[dict[str, Any]], verdicts: list[dict[str, Any]]
+) -> str:
+    """One phrase per candidate saying what the cluster actually answered."""
+    parts = []
+    for p, v in zip(placements, verdicts, strict=True):
+        where = f"{p['cluster']}/{p['namespace']}"
+        if not v.get("reachable", True):
+            parts.append(f"{where} unreachable")
+        else:
+            parts.append(f"{where} {int(v.get('pod_count', 0) or 0)} pod(s)")
+    return "; ".join(parts)
+
+
 async def resolve(
     claims: Claims,
     user_text: str,
@@ -151,12 +202,9 @@ async def resolve(
     {"default_environment": str | None} is read today (FR-CTX-8).
     """
     # -- unauthenticated: onboarding only, no checks (FR-ID-4) --------------
+    copy = get_settings().config_dir
     if not claims.sub:
-        return Onboarding(
-            "I could not read a signed-in identity for this session, so I cannot "
-            "resolve your applications or run checks. Sign in (in dev, pick an "
-            "identity in the masthead) and ask again."
-        ), None
+        return Onboarding(message(copy, "context.onboarding.unauthenticated")), None
 
     # -- explicit cluster scope: "attest <cluster>" (F6, FR-CTX-7) ----------
     m = _ATTEST_RE.search(user_text)
@@ -177,11 +225,10 @@ async def resolve(
         if len(matches) > 1:
             options = [c["name"] for c in matches][:8]
             return Clarify(
-                f"Several clusters match '{query}'. Which one?", options, "cluster"
+                message(copy, "context.clarify.cluster", query=query), options, "cluster"
             ), {"kind": "cluster", "options": options}
         return Onboarding(
-            f"No cluster matched '{query}'. Try the full name, an alias, or "
-            "ask me to list clusters for an environment or region."
+            message(copy, "context.onboarding.cluster_not_found", query=query)
         ), None
 
     # -- interpret a pending clarification reply ----------------------------
@@ -200,7 +247,7 @@ async def resolve(
                 picked = matches[0]["name"]
         if picked is None:
             return Clarify(
-                "I did not catch that; pick one of the options below.",
+                message(copy, "context.clarify.retry"),
                 pending.get("options", []), pending.get("kind", "application"),
             ), pending
         if pending.get("kind") == "application":
@@ -240,29 +287,23 @@ async def resolve(
         elif len(mine) > 1:
             options = sorted(a["application"] for a in mine)
             return Clarify(
-                f"You have {len(options)} registered applications. Which one first?",
+                message(copy, "context.clarify.application", count=len(options)),
                 options, "application",
             ), {"kind": "application", "options": options}
         else:
             return Onboarding(
-                "Your account has no registered applications yet, so I cannot resolve "
-                "what to triage. Your team lead can register you in the application "
-                "registry (owner-group mapping in fleet/applications.yaml). If you "
-                "tell me the application's name, I can proceed now and note it is "
-                "outside your registered set."
+                message(copy, "context.onboarding.no_registered_apps")
             ), None
 
     assert chosen_app is not None  # every earlier branch returned or assigned
 
-    # -- verify placement fleet-wide (FR-CTX-2) ------------------------------
-    app_label = chosen_app.get("app_label", chosen_app["application"])
-    placements_result = await client.call("obs__find_app_placements", {"app_label": app_label})
-    placements = placements_result.get("placements", [])
+    # -- placement: registry proposes, clusters confirm (FR-CTX-2) -----------
+    application = str(chosen_app["application"])
+    app_label = str(chosen_app.get("app_label", application))
+    placements = await _registry_candidates(client, application, app_label)
     if not placements:
         return Onboarding(
-            f"The registry knows {chosen_app['application']}, but I found no running "
-            "workloads for it anywhere in the fleet (kube_pod_labels returned no "
-            "series). Check the app label or whether it is deployed."
+            message(copy, "context.onboarding.no_placements", application=application)
         ), None
 
     envs = sorted({p["environment"] for p in placements})
@@ -283,22 +324,61 @@ async def resolve(
             chosen_env, assumed = default_env, True
         else:
             return Clarify(
-                f"{chosen_app['application']} runs in {len(envs)} environments. Which one?",
+                message(copy, "context.clarify.environment",
+                        application=application, count=len(envs)),
                 envs, "environment",
-            ), {"kind": "environment", "options": envs, "application": chosen_app["application"]}
+            ), {"kind": "environment", "options": envs, "application": application}
     env = chosen_env if chosen_env in envs else (chosen_env or envs[0])
     scoped = [p for p in placements if p["environment"] == env] or placements
 
-    instances = [
-        AppInstance(cluster=p["cluster"], namespace=p["namespace"], environment=p["environment"])
+    # Verification is per candidate and only for the scoped environment: there
+    # are a handful of them, and one unreachable cluster must not cost the turn.
+    verdicts = await asyncio.gather(*(
+        client.call("ocp__verify_placement", {
+            "cluster": p["cluster"], "namespace": p["namespace"], "app_label": app_label,
+        })
         for p in scoped
+    ))
+    verified = [(p, v) for p, v in zip(scoped, verdicts, strict=True) if v.get("verified")]
+    unreachable = [(p, v) for p, v in zip(scoped, verdicts, strict=True)
+                   if not v.get("verified") and not v.get("reachable", True)]
+
+    note: str | None = None
+    if verified:
+        # The common case: report only what a cluster confirmed. A candidate
+        # that answered "no pods here" is a stale registry row, not an
+        # instance, and it is dropped without narrowing the answer.
+        keep = verified
+    elif unreachable:
+        # Nothing verified, but nothing was actually denied either. Keeping the
+        # unreachable candidates (flagged) beats declaring the application gone
+        # on the strength of a cluster that would not answer.
+        keep = unreachable
+        note = message(copy, "context.note.unreachable_kept", count=len(unreachable))
+    else:
+        return Onboarding(message(
+            copy, "context.onboarding.unverified_placements",
+            application=application, app_label=app_label,
+            candidates=_candidate_list(scoped), detail=_verification_detail(scoped, verdicts),
+        )), None
+
+    instances = [
+        AppInstance(
+            cluster=p["cluster"], namespace=p["namespace"], environment=p["environment"],
+            verified=bool(v.get("verified")), reachable=bool(v.get("reachable", True)),
+            pod_count=int(v.get("pod_count", 0) or 0),
+            ready_count=int(v.get("ready_count", 0) or 0),
+        )
+        for p, v in keep
     ]
     context = ResolvedContext(
         scope="app", user_sub=claims.sub, user_name=claims.name, groups=claims.groups,
-        application=chosen_app["application"], app_label=app_label, environment=env,
+        application=application, app_label=app_label, environment=env,
         instances=instances, clusters=sorted({i.cluster for i in instances}),
         outside_registered_set=outside, environment_assumed=assumed,
+        placement_note=note,
     )
     log.info("context.resolved", application=context.application, environment=env,
-             clusters=context.clusters, outside=outside, environment_assumed=assumed)
+             clusters=context.clusters, outside=outside, environment_assumed=assumed,
+             candidates=len(placements), verified=len(instances))
     return Resolved(context), None

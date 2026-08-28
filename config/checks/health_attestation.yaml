@@ -37,6 +37,20 @@
 #   else any critical-severity fail -> degraded
 #   else any maintenance outcome    -> maintenance
 #   else                            -> healthy
+#
+# What this deployment can and cannot attest. Every check below reads the
+# Kubernetes/OpenShift API directly; there is no metrics pipeline, so the
+# five Prometheus-native checks this battery used to carry (etcd fsync and
+# quorum, firing alerts, the Watchdog dead man's switch, the API server SLO,
+# certificate-expiry alerts) are GONE rather than faked. Nothing below
+# reports a number that was not read from a cluster.
+#
+# Losing the Watchdog check also removed the battery's only `unattestable`
+# outcome, which would have made the FR-ATT-5 confidence cap dead code. The
+# honest replacement is api-reachability: a cluster whose API server did not
+# answer was not attested at all, so it is unattestable rather than degraded.
+# "Could not be asked" and "asked and unhealthy" stay distinguishable, which
+# is the whole point of the verdict.
 # ============================================================================
 
 version: 1
@@ -55,8 +69,8 @@ checks:
     rules:
       - path: reachable
         op: falsy
-        outcome: fail
-        reason: cluster API did not respond
+        outcome: unattestable
+        reason: cluster API did not respond, so nothing about this cluster could be attested
 
   - id: cluster-version
     name: ClusterVersion
@@ -142,85 +156,10 @@ checks:
         outcome: warn
         reason: a MachineConfigPool is paused; long pauses block cert rotation and upgrades
 
-  - id: etcd
-    name: etcd
-    severity: critical
-    tool: obs__get_etcd_health
-    args: { cluster: "{{ cluster }}" }
-    observed: members_up/members_expected
-    runbook: https://github.com/openshift/runbooks/blob/master/alerts/cluster-etcd-operator/etcdNoLeader.md
-    rules:
-      - path: has_leader
-        op: falsy
-        outcome: fail
-        reason: etcd has no leader; the control plane cannot serve reads or writes
-      - path: quorum
-        op: falsy
-        outcome: fail
-        reason: etcd quorum lost or members down
-      - path: fsync_p99_ms
-        op: gt
-        value: 10
-        outcome: warn
-        reason: etcd WAL fsync p99 above 10ms; slow disk degrades the whole control plane
-
-  - id: firing-alerts
-    name: Firing alerts
-    severity: critical
-    tool: obs__get_firing_alerts
-    args: { cluster: "{{ cluster }}" }
-    observed: summary
-    runbook: https://runbooks.prometheus-operator.dev/
-    rules:
-      - path: critical
-        op: not_empty
-        outcome: fail
-        reason: critical alerts firing (Watchdog excluded)
-      - path: warning
-        op: not_empty
-        outcome: warn
-        reason: warning alerts firing
-
-  - id: watchdog-present
-    name: Watchdog present
-    severity: critical
-    tool: obs__get_firing_alerts
-    args: { cluster: "{{ cluster }}" }
-    observed: watchdog_present
-    runbook: https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/
-    rules:
-      - path: watchdog_present
-        op: falsy
-        outcome: unattestable
-        reason: the Watchdog dead man's switch is not firing; the monitoring pipeline itself cannot be trusted
-      - path: monitoring_healthy
-        op: falsy
-        outcome: unattestable
-        reason: the monitoring stack reports unhealthy; cluster signals may be stale
-
-  - id: apiserver-slo
-    name: API server SLO
-    severity: warning
-    tool: obs__get_apiserver_slo
-    args: { cluster: "{{ cluster }}" }
-    observed: error_rate_5xx
-    runbook: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/KubeAPIErrorBudgetBurn.md
-    rules:
-      - path: error_rate_5xx
-        op: gt
-        value: 0.05
-        outcome: fail
-        reason: API server 5xx error rate above 5 percent
-      - path: error_rate_5xx
-        op: gt
-        value: 0.01
-        outcome: warn
-        reason: API server 5xx error rate above 1 percent
-
   - id: capacity
     name: Capacity headroom
     severity: warning
-    tool: obs__get_capacity_summary
+    tool: ocp__get_capacity
     args: { cluster: "{{ cluster }}" }
     observed: summary
     runbook: https://monitoring.mixins.dev/kubernetes/#kubecpuovercommit
@@ -234,6 +173,11 @@ checks:
         value: 0.95
         outcome: warn
         reason: pod count above 95 percent of cluster pod capacity
+      - path: cpu_requests_ratio
+        op: gt
+        value: 0.9
+        outcome: warn
+        reason: cpu requests above 90 percent of allocatable; the scheduler has little room left
 
   - id: pending-csrs
     name: Pending CSRs
@@ -248,16 +192,3 @@ checks:
         value: 0
         outcome: warn
         reason: unapproved certificate signing requests; stale CSRs eventually drive nodes NotReady
-
-  - id: cert-expiry
-    name: Certificate expiry signals
-    severity: warning
-    tool: obs__get_firing_alerts
-    args: { cluster: "{{ cluster }}" }
-    observed: cert_expiry_alerts
-    runbook: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeclientcertificateexpiration/
-    rules:
-      - path: cert_expiry_alerts
-        op: not_empty
-        outcome: warn
-        reason: certificate expiration alerts are firing

@@ -5,31 +5,24 @@
 # This registry answers "who owns what" (identity claims' groups are matched
 # against `owner_groups`) and carries the operational facts the Application
 # 360 report's registry-sourced sections render (owners, SLA, backup policy,
-# runbooks, escalation). Where an application RUNS is never taken from this
-# file: placement is discovered live from Prometheus series (FR-CTX-2).
-#
-# `instances` below exist for the mock world builder and live-mode hints
-# only; the agent always verifies placement through obs__find_app_placements.
+# runbooks, escalation).
 #
 # SEED FIXTURE for the MongoDB fleet registry (docs/design/LIVE-CUTOVER.md).
-# `python -m cloudops.registry.seed` loads this file into the `apps` and
-# `placements` collections; Mongo is the runtime truth from then on, and an
-# edit here only takes effect on the next seed run.
+# `make mongo-seed` loads this file into the `apps` and `placements`
+# collections; Mongo is the runtime truth from then on, and an edit here only
+# takes effect on the next seed run.
 #
-#   app_id           short code a human actually types ("SSOP"); the natural
-#                    key of the apps collection and what resolve_entity
-#                    matches exactly
-#   lob              line of business; carried onto every placement so
-#                    blast_radius can answer LOB-scoped questions
-#   live_placements  explicit placements on the reference kind fleet, for the
-#                    apps that are really deployed there by deploy/live/.
-#                    Apps without it get placements DERIVED from `instances`
-#                    by matching each instance's environment to live clusters
-#                    of the same environment (see registry/seed.py). The
-#                    explicit form exists because the kind fleet's
-#                    environment labels do not line up with the demo
-#                    namespaces, and a registry that guesses would then be
-#                    wrong about the one scenario the demo depends on.
+#   app_id     short code a human actually types ("SSOP"); the natural key of
+#              the apps collection and what resolve_entity matches exactly
+#   lob        line of business; carried onto every placement so blast_radius
+#              can answer LOB-scoped questions
+#   instances  seed rows for the `placements` collection, named against the
+#              live fleet's clusters. Where an application actually runs is
+#              always a two-step contract (FR-CTX-2): the registry proposes
+#              candidates, and ocp__verify_placement confirms each one against
+#              the cluster API. A placement listed here that no cluster backs
+#              is reported as a stale registry row, never as a running
+#              instance.
 # ============================================================================
 
 version: 1
@@ -39,7 +32,7 @@ applications:
     app_id: PAY
     lob: Payments
     # app.kubernetes.io/name on its pods. deploy/live/3*-*.yaml sets exactly
-    # this label, which is what makes live placement discovery find the app on
+    # this label, which is what ocp__verify_placement matches on
     # acm-spoke-1a (healthy) and acm-spoke-2a (crash-looping sidecar).
     app_label: payments-api
     owner_groups: [payments-eng]
@@ -64,10 +57,6 @@ applications:
       rpo: 24h
       rto: 4h
     instances:
-      - { cluster: prod-east-1, namespace: payments-prod, environment: prod }
-      - { cluster: prod-east-2, namespace: payments-prod, environment: prod }
-      - { cluster: nonprod-east-1, namespace: payments-dev, environment: nonprod }
-    live_placements:
       - { cluster: acm-spoke-1a, namespace: payments-prod, environment: prod }
       - { cluster: acm-spoke-2a, namespace: payments-prod, environment: nonprod }
 
@@ -93,9 +82,8 @@ applications:
       - { name: orders-db, type: database }
     backup: { policy: continuous WAL shipping, rpo: 15m, rto: 1h }
     instances:
-      - { cluster: prod-east-1, namespace: checkout-prod, environment: prod }
-      - { cluster: prod-east-2, namespace: checkout-prod, environment: prod }
-      - { cluster: prod-west-4, namespace: checkout-prod, environment: prod }
+      - { cluster: acm-hub-1, namespace: checkout-prod, environment: prod }
+      - { cluster: acm-spoke-1a, namespace: checkout-prod, environment: prod }
 
   - application: loyalty
     app_id: LOYL
@@ -114,7 +102,7 @@ applications:
     dependencies: [{ name: loyalty-db, type: database }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 8h }
     instances:
-      - { cluster: prod-west-4, namespace: loyalty-prod, environment: prod }
+      - { cluster: acm-spoke-1b, namespace: loyalty-prod, environment: prod }
 
   - application: refunds
     app_id: RFND
@@ -133,7 +121,7 @@ applications:
     dependencies: [{ name: orders-db, type: database }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 8h }
     instances:
-      - { cluster: prod-east-1, namespace: refunds-prod, environment: prod }
+      - { cluster: acm-spoke-1a, namespace: refunds-prod, environment: prod }
 
   - application: catalog
     app_id: CTLG
@@ -152,8 +140,8 @@ applications:
     dependencies: [{ name: catalog-search, type: internal_service }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 8h }
     instances:
-      - { cluster: prod-east-1, namespace: catalog-prod, environment: prod }
-      - { cluster: nonprod-east-1, namespace: catalog-dev, environment: nonprod }
+      - { cluster: acm-spoke-1a, namespace: catalog-prod, environment: prod }
+      - { cluster: acm-spoke-2b, namespace: catalog-dev, environment: nonprod }
 
   - application: pricing
     app_id: PRCG
@@ -172,7 +160,7 @@ applications:
     dependencies: [{ name: pricing-cache, type: cache }]
     backup: { policy: config-only, rpo: n/a, rto: 1h }
     instances:
-      - { cluster: prod-east-1, namespace: pricing-prod, environment: prod }
+      - { cluster: acm-spoke-1a, namespace: pricing-prod, environment: prod }
 
   - application: audit-log
     app_id: ADTL
@@ -191,13 +179,13 @@ applications:
     dependencies: [{ name: audit-kafka, type: message_queue }]
     backup: { policy: object storage retention 7y, rpo: 24h, rto: 24h }
     instances:
-      - { cluster: prod-east-2, namespace: audit-prod, environment: prod }
+      - { cluster: acm-hub-1, namespace: audit-prod, environment: prod }
 
   - application: inventory-sync
     app_id: INVS
     lob: Logistics
-    # Live mode finds this one on acm-spoke-1b in namespace logistics-dev,
-    # deployed with the same label by deploy/live/32-logistics-dev.yaml.
+    # Deployed on acm-spoke-1b in namespace logistics-dev with the same
+    # label by deploy/live/32-logistics-dev.yaml.
     app_label: inventory-sync
     owner_groups: [logistics-eng]
     criticality: medium
@@ -212,8 +200,6 @@ applications:
     dependencies: [{ name: warehouse-api, type: external_api }]
     backup: { policy: source-of-truth upstream, rpo: n/a, rto: n/a }
     instances:
-      - { cluster: nonprod-east-1, namespace: logistics-dev, environment: nonprod }
-    live_placements:
       - { cluster: acm-spoke-1b, namespace: logistics-dev, environment: prod }
 
   # The self-service operations portal. Its short id is what a user actually
@@ -238,8 +224,5 @@ applications:
     dependencies: [{ name: ssop-db, type: database }]
     backup: { policy: nightly snapshot, rpo: 24h, rto: 2h }
     instances:
-      - { cluster: prod-east-1, namespace: ssop-prod, environment: prod }
-      - { cluster: nonprod-east-1, namespace: ssop-dev, environment: nonprod }
-    live_placements:
       - { cluster: acm-hub-1, namespace: ssop-prod, environment: prod }
       - { cluster: acm-hub-2, namespace: ssop-dev, environment: nonprod }

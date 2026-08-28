@@ -6,7 +6,6 @@
 # load-bearing; the sleeps just keep first-boot logs tidy.
 ocp: sh -c 'cd backend && uv run python -m cloudops.mcp_servers.openshift'
 reg: sh -c 'cd backend && uv run python -m cloudops.mcp_servers.registry'
-obs: sh -c 'cd backend && uv run python -m cloudops.mcp_servers.observability'
 gateway: sh -c 'sleep 2 && cd backend && uv run python -m cloudops.gateway'
 agent: sh -c 'sleep 4 && cd backend && uv run python -m cloudops.agent'
 bff: sh -c 'cd frontend && npm run dev:server'

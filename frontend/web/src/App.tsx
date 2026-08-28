@@ -42,7 +42,7 @@ export default function App() {
   }, [state]);
   const [users, setUsers] = useState<Persona[]>([]);
   const [selected, setSelected] = useState("");
-  const [meta, setMeta] = useState<ConsoleMeta>({ mode: "…", env: "dev", configVersion: "" });
+  const [meta, setMeta] = useState<ConsoleMeta>({ env: "dev", configVersion: "" });
   const [me, setMe] = useState<Persona | null>(null);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Masthead users={users} selected={selected} onSelect={selectUser} mode={meta.mode} authMode={meta.authMode} me={me} />
+      <Masthead users={users} selected={selected} onSelect={selectUser} authMode={meta.authMode} me={me} />
       <div className="cols">
         <div className="rail-left">
           <ContextCard context={state.context} />

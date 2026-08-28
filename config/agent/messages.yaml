@@ -1,0 +1,94 @@
+# ============================================================================
+# Conversational copy the runtime speaks in its own voice.
+#
+# These strings are NOT written by the model: the deterministic phases emit
+# them directly, so they are product copy and belong in the config plane, not
+# in Python. Read fresh on every use, so an edit lands on the next message
+# with no restart (FR-CFG-2).
+#
+# Placeholders are str.format style: {name}. Every placeholder a template uses
+# must be one the calling site supplies; an unknown key or a missing message
+# is logged loudly and rendered as a visible marker rather than silently
+# falling back to a duplicate string in code.
+#
+# Keys are addressed by dotted path (context.onboarding.unauthenticated).
+# ============================================================================
+
+version: 1
+
+context:
+  onboarding:
+    # No signed-in identity at all: nothing may run (FR-ID-4).
+    unauthenticated: >-
+      I could not read a signed-in identity for this session, so I cannot
+      resolve your applications or run checks. Sign in (in dev, pick an
+      identity in the masthead) and ask again.
+
+    # The user's account maps to no application in the registry (FR-CTX-5).
+    no_registered_apps: >-
+      Your account has no registered applications yet, so I cannot resolve
+      what to triage. Your team lead can register you in the application
+      registry (owner-group mapping in fleet/applications.yaml). If you tell
+      me the application's name, I can proceed now and note it is outside
+      your registered set.
+
+    # "attest <something>" that resolved to nothing.
+    cluster_not_found: >-
+      No cluster matched '{query}'. Try the full name, an alias, or ask me to
+      list clusters for an environment or region.
+
+    # The registry has no placement rows for the application at all.
+    no_placements: >-
+      The registry knows {application}, but it lists no placements for it
+      anywhere in the fleet. Check the application id or the app label, or
+      ask your platform team to register where it is deployed.
+
+    # The registry proposed placements and the clusters said none are real.
+    # FR-CTX-2: the registry proposes, the cluster API disposes, and a
+    # registry row nothing backs is a registry bug worth naming.
+    unverified_placements: >-
+      The registry says {application} runs in {candidates}, but none of those
+      namespaces has any pod matching the label {app_label}. Either the
+      workload is not deployed there any more or the registry entry is stale.
+      Checked: {detail}.
+
+    # Every candidate cluster refused to answer, so absence is not proven.
+    unreachable_placements: >-
+      The registry says {application} runs in {candidates}, but none of those
+      cluster APIs answered, so I cannot confirm or deny that it is running.
+      This is a platform reachability problem, not an application finding.
+      Checked: {detail}.
+
+  clarify:
+    # Exactly one question, always with enumerated options (FR-CTX-4).
+    application: "You have {count} registered applications. Which one first?"
+    environment: "{application} runs in {count} environments. Which one?"
+    cluster: "Several clusters match '{query}'. Which one?"
+    retry: "I did not catch that; pick one of the options below."
+
+  # Attached to the resolved context when some placements were kept without
+  # live confirmation, so every surface can disclose it.
+  note:
+    unreachable_kept: >-
+      {count} placement(s) could not be verified because their cluster API did
+      not answer; they are included as unconfirmed.
+
+analyst:
+  # FR-CHAT-5: the per-turn tool budget ran out mid-loop.
+  tool_budget_exhausted: >-
+    Tool budget exhausted ({limit} calls this turn). Answer with the evidence
+    you already have and tell the user which check you would run next.
+
+  # The model invented a tool name.
+  unknown_tool: "No tool named '{tool}' exists."
+  unknown_tool_hint: >-
+    Tool names are exact and prefixed by domain: ocp__* for OpenShift cluster
+    and application state, reg__* for fleet registry lookups (which
+    application, which cluster, blast radius). Re-check the name and retry
+    once, or answer from the evidence you already have.
+
+  # A real tool call failed downstream.
+  tool_failed: "Tool '{tool}' failed: {error_type}."
+  tool_failed_hint: >-
+    Do not retry the same call. Tell the user this check could not be
+    completed and continue with the evidence you have.
