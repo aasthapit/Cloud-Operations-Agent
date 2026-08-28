@@ -1,0 +1,21 @@
+# ============================================================================
+# SPA console configuration. Hot-read per request by the BFF's GET /api/ui;
+# the web app fetches this once at boot and falls back to its own built-in
+# defaults if the endpoint is unreachable.
+# ============================================================================
+
+version: 1
+
+# How often the rail polls GET /api/meta for a config-version change or a
+# rejected reload (FR-CFG-3).
+metaPollMs: 5000
+
+# Max lines kept in the activity log panel (oldest lines fall off).
+activityLogCap: 200
+
+composer:
+  placeholder: "Ask a question…"
+  emptyStateProse: "Ask about an application or a cluster; I attest platform health before every answer."
+  emptyStateExamples:
+    - "Why is payments-api flaky in prod?"
+    - "attest prod-east-2"
