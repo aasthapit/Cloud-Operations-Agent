@@ -25,6 +25,14 @@
 #
 # Report status mapping (engine, FR-360-5): any failed critical check ->
 # critical; any failed or warning check -> at_risk; otherwise healthy.
+#
+# What this deployment can and cannot report. Every check reads the
+# Kubernetes API; no metrics pipeline stands behind the agent. The five
+# Prometheus-native checks this battery used to carry (firing application
+# alerts, request error rate, latency p95, memory headroom, CPU throttling)
+# are GONE rather than faked, and sections 9 and 12 say so in words instead
+# of showing an invented number. Autoscaling headroom and disruption budgets
+# survive because HPA and PDB are API objects, not metrics.
 # ============================================================================
 
 version: 1
@@ -254,51 +262,17 @@ sections:
 
   - section: 9
     title: Observability
-    source: checks
-    checks:
-      - id: app-alerts
-        name: Firing application alerts
-        severity: critical
-        tool: obs__get_firing_alerts
-        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}" }
-        observed: summary
-        rules:
-          - path: critical
-            op: not_empty
-            outcome: fail
-            reason: critical alerts firing in the application namespace
-          - path: warning
-            op: not_empty
-            outcome: warn
-            reason: warning alerts firing in the application namespace
-      - id: error-rate
-        name: Error rate
-        severity: critical
-        tool: obs__get_golden_signals
-        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
-        observed: error_rate
-        rules:
-          - path: error_rate
-            op: gt
-            value: 0.05
-            outcome: fail
-            reason: request error rate above 5 percent
-          - path: error_rate
-            op: gt
-            value: 0.01
-            outcome: warn
-            reason: request error rate above 1 percent
-      - id: latency
-        name: Latency p95
-        severity: warning
-        tool: obs__get_golden_signals
-        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
-        observed: p95_latency_ms
-        rules:
-          - path: latency_breach
-            op: truthy
-            outcome: warn
-            reason: p95 latency above the application's SLO target
+    source: narrative
+    registry_fields:
+      - monitoring_owner
+    manual_items:
+      - >-
+        Metrics are not collected in this deployment: there is no Prometheus,
+        Thanos or Grafana behind the agent, so firing alerts, request error
+        rate and latency percentiles cannot be read. This section reports that
+        absence rather than a fabricated reading. Runtime evidence for this
+        application comes from the Kubernetes API instead (section 4).
+      - Confirm alert routing and dashboards with the monitoring owner above
 
   - section: 10
     title: Dependency health
@@ -329,40 +303,22 @@ sections:
     title: Capacity and performance
     source: checks
     checks:
-      - id: memory-headroom
-        name: Memory headroom
-        severity: critical
-        tool: obs__get_workload_usage
-        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
-        observed: memory_summary
-        rules:
-          - path: memory.usage_ratio_of_limit
-            op: gt
-            value: 0.97
-            outcome: fail
-            reason: p95 memory usage within 3 percent of the limit; OOM kills imminent
-          - path: memory.usage_ratio_of_limit
-            op: gt
-            value: 0.9
-            outcome: warn
-            reason: p95 memory usage above 90 percent of the limit
-      - id: cpu-throttling
-        name: CPU throttling
+      - id: host-cluster-capacity
+        name: Host cluster headroom
         severity: warning
-        tool: obs__get_workload_usage
-        args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
-        observed: throttling_ratio
-        runbook: https://monitoring.mixins.dev/kubernetes/#cputhrottlinghigh
+        tool: ocp__get_capacity
+        args: { cluster: "{{ cluster }}" }
+        observed: summary
+        runbook: https://monitoring.mixins.dev/kubernetes/#kubecpuovercommit
         rules:
-          - path: throttling_ratio
-            op: gt
-            value: 0.25
+          - path: fits_minus_one_node
+            op: falsy
             outcome: warn
-            reason: over 25 percent of CPU periods throttled (CPUThrottlingHigh threshold)
+            reason: the host cluster cannot absorb this app's requests after losing one node
       - id: hpa-maxed
         name: HPA at max replicas
         severity: warning
-        tool: obs__get_workload_usage
+        tool: ocp__get_autoscaling
         args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
         observed: hpa_summary
         runbook: https://monitoring.mixins.dev/kubernetes/#kubehpamaxedout
@@ -371,6 +327,11 @@ sections:
             op: truthy
             outcome: warn
             reason: HPA pinned at max replicas (min==max excluded, mirroring KubeHpaMaxedOut)
+    manual_items:
+      - >-
+        Actual CPU and memory usage against requests and limits needs a metrics
+        pipeline, which this deployment does not have; only the DECLARED
+        requests and limits below are observable.
 
   - section: 13
     title: Release and change history
@@ -397,7 +358,7 @@ sections:
       - id: pdb-disruptions
         name: PDB disruption budget
         severity: warning
-        tool: obs__get_workload_usage
+        tool: ocp__get_autoscaling
         args: { cluster: "{{ cluster }}", namespace: "{{ namespace }}", app_label: "{{ app_label }}" }
         observed: pdb_summary
         runbook: https://monitoring.mixins.dev/kubernetes/#kubepdbnotenoughhealthypods

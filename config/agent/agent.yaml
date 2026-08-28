@@ -18,7 +18,7 @@ skills:
     enabled: true
   - file: skills/app360-analysis.md
     enabled: true
-  - file: skills/prometheus-query-crafting.md
+  - file: skills/fleet-registry.md
     enabled: true
 
 # Context resolution policy. The deterministic orchestrator (not the LLM)
