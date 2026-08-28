@@ -121,6 +121,31 @@ export interface ReloadError {
   at: string;
 }
 
+/** GET /api/commands: the slash-command palette source. */
+export interface SlashCommand {
+  name: string;
+  /** Placeholder shown after the name, e.g. "<cluster>". */
+  args?: string;
+  description: string;
+  kind: "client" | "message";
+  /** Prefill text for a kind:"message" command whose content isn't a
+   * client-known literal (skill commands); /attest builds its own. */
+  template?: string;
+}
+
+/** GET /api/ui: poll interval, log cap, and composer copy (Config and
+ * prompt extraction). Fetched once at boot; see DEFAULT_UI_CONFIG in
+ * api.ts for the fallback used if the endpoint is unreachable. */
+export interface UiConfig {
+  metaPollMs: number;
+  activityLogCap: number;
+  composer: {
+    placeholder: string;
+    emptyStateProse: string;
+    emptyStateExamples: string[];
+  };
+}
+
 /** GET /api/meta: the BFF's own facts plus the agent's config status. */
 export interface ConsoleMeta {
   mode: string;
@@ -137,6 +162,9 @@ export interface ConsoleMeta {
 export type StreamEvent =
   | { type: "meta"; contextId: string }
   | { type: "text"; delta: string }
+  /** Reasoning-model deliberation (ADK's `adk_thought` parts), always
+   * rendered separately from the narrative and excluded from exports. */
+  | { type: "thought"; text: string }
   | { type: "phase"; payload: PhasePayload }
   | { type: "context"; payload: ContextPayload }
   | { type: "clarify"; payload: ClarifyPayload }

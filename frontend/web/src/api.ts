@@ -3,7 +3,20 @@
  * The stream reader parses `data:` frames into StreamEvent objects and
  * hands them to the caller's callback in arrival order.
  */
-import type { ConsoleMeta, Persona, StreamEvent } from "./types";
+import type { ConsoleMeta, Persona, SlashCommand, StreamEvent, UiConfig } from "./types";
+
+/** Fallback if GET /api/ui is unreachable; mirrors frontend/server/src/ui.ts
+ * DEFAULT_UI_CONFIG so the console degrades to the same copy either way. */
+export const DEFAULT_UI_CONFIG: UiConfig = {
+  metaPollMs: 5000,
+  activityLogCap: 200,
+  composer: {
+    placeholder: "Ask a question…",
+    emptyStateProse:
+      "Ask about an application or a cluster; I attest platform health before every answer.",
+    emptyStateExamples: ["Why is payments-api flaky in prod?", "attest prod-east-2"],
+  },
+};
 
 /**
  * In oidc mode a real deployment obtains the token from its login flow; for
@@ -28,6 +41,18 @@ export async function fetchUsers(): Promise<Persona[]> {
 export async function fetchMeta(): Promise<ConsoleMeta> {
   const res = await fetch("/api/meta");
   return (await res.json()) as ConsoleMeta;
+}
+
+export async function fetchCommands(): Promise<SlashCommand[]> {
+  const res = await fetch("/api/commands");
+  const body = (await res.json()) as { commands: SlashCommand[] };
+  return body.commands;
+}
+
+export async function fetchUiConfig(): Promise<UiConfig> {
+  const res = await fetch("/api/ui");
+  if (!res.ok) return DEFAULT_UI_CONFIG;
+  return (await res.json()) as UiConfig;
 }
 
 /** Verified identity in oidc mode; { mode: "dev" } otherwise. */
