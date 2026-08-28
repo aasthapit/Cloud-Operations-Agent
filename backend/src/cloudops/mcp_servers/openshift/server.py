@@ -4,13 +4,17 @@ Tool surface (FR-MCP-1..3): fleet resolver plus read-only cluster and
 namespace state. Every cluster-scoped tool takes an explicit, resolved
 cluster name and errors on unknown clusters instead of guessing (FR-MCP-2).
 
-Backend selection (decision D6): mock answers from the shared synthetic
-World; live talks to real cluster APIs. Result shapes are identical, and
-they are the contract the check batteries in config/checks/*.yaml address
+One backend: LiveOpenShiftBackend, talking to real cluster APIs. Result
+shapes are the contract the check batteries in config/checks/*.yaml address
 by dotted path.
 
+Test seam: build_server accepts a pre-built backend. Tests hand it a
+LiveOpenShiftBackend wired to a fake fleet whose KubeClients answer from
+canned Kubernetes payloads, so the E2E harness boots this very server
+without touching a cluster.
+
 Secrets discipline: get_configuration returns Secret NAMES only, never data
-(NFR-LOG-3); the live backend must uphold the same rule.
+(NFR-LOG-3).
 """
 
 from __future__ import annotations
@@ -22,12 +26,12 @@ from pydantic import Field
 
 from cloudops.common.settings import get_settings
 from cloudops.mcp_servers.openshift.live import LiveOpenShiftBackend
-from cloudops.mcp_servers.shared import WorldHolder, instrumented
+from cloudops.mcp_servers.shared import instrumented
 
 SERVICE = "cloudops.mcp.openshift"
 
 
-def build_server(holder: WorldHolder) -> FastMCP:
+def build_server(backend: LiveOpenShiftBackend | None = None) -> FastMCP:
     settings = get_settings()
     mcp = FastMCP(
         "openshift-mcp",
@@ -41,13 +45,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         stateless_http=True,
     )
 
-    live = LiveOpenShiftBackend()
-
-    def backend() -> Any:
-        """Resolve the backend per call so a mock-world hot reload or a mode
-        change never needs a server restart."""
-        return holder.world if settings.cloudops_backend_mode == "mock" else live
-
+    ocp = backend or LiveOpenShiftBackend()
     span = instrumented(SERVICE)
 
     # -- fleet resolution ---------------------------------------------------
@@ -60,7 +58,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         """Resolve a query to cluster identities across the fleet of hundreds.
         Returns exact matches first; several candidates mean the caller must
         pick or ask, never guess."""
-        return backend().resolve_cluster(query)
+        return ocp.resolve_cluster(query)
 
     @mcp.tool()
     @span
@@ -71,7 +69,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         page_size: int = Field(default=50, ge=1, le=200),
     ) -> dict[str, Any]:
         """Page through the fleet registry, optionally filtered."""
-        return backend().list_clusters(environment, region, page, page_size)
+        return ocp.list_clusters(environment, region, page, page_size)
 
     # -- cluster state ------------------------------------------------------
 
@@ -79,38 +77,38 @@ def build_server(holder: WorldHolder) -> FastMCP:
     @span
     def get_cluster_info(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
         """Cluster identity, reachability, and endpoints."""
-        return backend().get_cluster_info(cluster)
+        return ocp.get_cluster_info(cluster)
 
     @mcp.tool()
     @span
     def get_cluster_version(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
         """ClusterVersion conditions (Available/Progressing/Failing) and update history."""
-        return backend().get_cluster_version(cluster)
+        return ocp.get_cluster_version(cluster)
 
     @mcp.tool()
     @span
     def get_cluster_operators(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
         """ClusterOperator health, pre-summarized: degraded, critical_degraded,
         progressing, unavailable."""
-        return backend().get_cluster_operators(cluster)
+        return ocp.get_cluster_operators(cluster)
 
     @mcp.tool()
     @span
     def get_nodes(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
         """Node readiness, pressure conditions, and cordoned (maintenance) nodes."""
-        return backend().get_nodes(cluster)
+        return ocp.get_nodes(cluster)
 
     @mcp.tool()
     @span
     def get_machine_config_pools(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
         """MachineConfigPool rollout state: the OCP signal that nodes are rolling."""
-        return backend().get_machine_config_pools(cluster)
+        return ocp.get_machine_config_pools(cluster)
 
     @mcp.tool()
     @span
     def get_pending_csrs(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
         """Pending certificate signing requests."""
-        return backend().get_pending_csrs(cluster)
+        return ocp.get_pending_csrs(cluster)
 
     # -- namespace / application state --------------------------------------
 
@@ -123,7 +121,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
     ) -> dict[str, Any]:
         """Workloads, replicas, rollout state, and pod pathology (crashloops,
         image pull errors, OOM kills, restart churn, probes) for one app."""
-        return backend().get_workloads(cluster, namespace, app_label)
+        return ocp.get_workloads(cluster, namespace, app_label)
 
     @mcp.tool()
     @span
@@ -132,7 +130,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         namespace: str = Field(description="Namespace"),
     ) -> dict[str, Any]:
         """Recent Warning events in a namespace (the 'why' after a metric check fails)."""
-        return backend().get_events(cluster, namespace)
+        return ocp.get_events(cluster, namespace)
 
     @mcp.tool()
     @span
@@ -141,7 +139,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         namespace: str = Field(description="Namespace"),
     ) -> dict[str, Any]:
         """ResourceQuota usage and LimitRanges."""
-        return backend().get_quotas(cluster, namespace)
+        return ocp.get_quotas(cluster, namespace)
 
     @mcp.tool()
     @span
@@ -151,7 +149,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         app_label: str = Field(description="app.kubernetes.io/name label value"),
     ) -> dict[str, Any]:
         """Services, routes with TLS termination and cert expiry, NetworkPolicies, DNS."""
-        return backend().get_network(cluster, namespace, app_label)
+        return ocp.get_network(cluster, namespace, app_label)
 
     @mcp.tool()
     @span
@@ -161,7 +159,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         app_label: str = Field(description="app.kubernetes.io/name label value"),
     ) -> dict[str, Any]:
         """PersistentVolumeClaim binding, capacity, and growth."""
-        return backend().get_pvcs(cluster, namespace, app_label)
+        return ocp.get_pvcs(cluster, namespace, app_label)
 
     @mcp.tool()
     @span
@@ -172,7 +170,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
     ) -> dict[str, Any]:
         """ConfigMap and Secret REFERENCES for an app. Secret names and
         metadata only, never secret data."""
-        return backend().get_configuration(cluster, namespace, app_label)
+        return ocp.get_configuration(cluster, namespace, app_label)
 
     @mcp.tool()
     @span
@@ -182,7 +180,7 @@ def build_server(holder: WorldHolder) -> FastMCP:
         app_label: str = Field(description="app.kubernetes.io/name label value"),
     ) -> dict[str, Any]:
         """ServiceAccount, SCC/PSA compliance, exposure level, TLS status."""
-        return backend().get_security_posture(cluster, namespace, app_label)
+        return ocp.get_security_posture(cluster, namespace, app_label)
 
     @mcp.tool()
     @span
@@ -191,6 +189,43 @@ def build_server(holder: WorldHolder) -> FastMCP:
     ) -> dict[str, Any]:
         """The application registry entry: owners, criticality, SLA/SLO,
         runbooks, escalation, dependencies, backup policy."""
-        return backend().get_app_registry_entry(application)
+        return ocp.get_app_registry_entry(application)
+
+    @mcp.tool()
+    @span
+    def get_namespaces(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
+        """Namespace inventory for a cluster: what exists to look inside."""
+        return ocp.get_namespaces(cluster)
+
+    @mcp.tool()
+    @span
+    def get_capacity(cluster: str = Field(description="Resolved cluster name")) -> dict[str, Any]:
+        """Pod resource requests versus node allocatable across the cluster,
+        computed from the Kubernetes API (no metrics pipeline involved)."""
+        return ocp.get_capacity(cluster)
+
+    @mcp.tool()
+    @span
+    def verify_placement(
+        cluster: str = Field(description="Resolved cluster name"),
+        namespace: str = Field(description="Namespace"),
+        app_label: str = Field(description="app.kubernetes.io/name label value"),
+    ) -> dict[str, Any]:
+        """Confirm from the cluster itself that an application actually runs in
+        this namespace. The registry proposes placements; this verifies them.
+        An unreachable cluster returns reachable=false rather than erroring."""
+        return ocp.verify_placement(cluster, namespace, app_label)
+
+    @mcp.tool()
+    @span
+    def get_autoscaling(
+        cluster: str = Field(description="Resolved cluster name"),
+        namespace: str = Field(description="Namespace"),
+        app_label: str = Field(description="app.kubernetes.io/name label value"),
+    ) -> dict[str, Any]:
+        """HorizontalPodAutoscalers and PodDisruptionBudgets in a namespace:
+        min/max/current replicas and whether the HPA is pinned at max, plus
+        allowed disruptions and expected pods per budget."""
+        return ocp.get_autoscaling(cluster, namespace, app_label)
 
     return mcp

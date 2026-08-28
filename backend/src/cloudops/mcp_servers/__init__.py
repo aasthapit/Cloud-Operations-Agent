@@ -1,9 +1,8 @@
-"""Domain MCP servers (OpenShift, observability).
+"""Domain MCP servers.
 
-Each server is an independent process speaking MCP over streamable HTTP,
-registered with the gateway via config/gateway/servers.yaml. Both follow
-the same shape: FastMCP tool definitions that delegate to a backend chosen
-by CLOUDOPS_BACKEND_MODE (mock: the shared synthetic World; live: real
-cluster APIs / Thanos). Tool result shapes are identical in both modes
-(decision D6).
+Each server is an independent process speaking MCP over streamable HTTP and
+is registered with the gateway via config/gateway/servers.yaml. There is one
+backend: live cluster APIs read through cloudops.mcp_servers.kube. Tool
+result shapes are the contract the check batteries in config/checks/*.yaml
+address by dotted path.
 """

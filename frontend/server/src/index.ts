@@ -107,7 +107,6 @@ async function agentStatus(): Promise<AgentStatus | null> {
 app.get("/api/meta", async (_req, res) => {
   const status = await agentStatus();
   res.json({
-    mode: config.backendMode,
     env: config.env,
     authMode: authConfig().mode,
     // The agent hashes the same file set; its answer wins when it is up so
@@ -221,5 +220,5 @@ if (fs.existsSync(webDist)) {
 }
 
 app.listen(config.port, "127.0.0.1", () => {
-  logger.info({ port: config.port, mode: config.backendMode }, "bff.serving");
+  logger.info({ port: config.port, env: config.env }, "bff.serving");
 });

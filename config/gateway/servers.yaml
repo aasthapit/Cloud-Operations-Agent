@@ -45,21 +45,9 @@ servers:
       - get_configuration
       - get_security_posture
       - get_app_registry_entry
-
-  - prefix: obs
-    name: Observability MCP
-    url: "http://localhost:${CLOUDOPS_MCP_OBSERVABILITY_PORT:8012}/mcp"
-    enabled: true
-    timeout_seconds: 30
-    allow_tools:
-      - query_instant
-      - find_app_placements
-      - get_firing_alerts
-      - get_etcd_health
-      - get_apiserver_slo
-      - get_capacity_summary
-      - get_golden_signals
-      - get_workload_usage
-      - get_dashboard_links
+      - get_namespaces
+      - get_capacity
+      - verify_placement
+      - get_autoscaling
 
 deny_tools: []

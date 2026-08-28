@@ -123,7 +123,6 @@ export interface ReloadError {
 
 /** GET /api/meta: the BFF's own facts plus the agent's config status. */
 export interface ConsoleMeta {
-  mode: string;
   env: string;
   /** "dev" (persona picker) or "oidc" (verified bearer token). */
   authMode?: string;

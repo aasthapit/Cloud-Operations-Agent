@@ -5,7 +5,6 @@ export function Masthead(props: {
   users: Persona[];
   selected: string;
   onSelect: (sub: string) => void;
-  mode: string;
   /** "dev" shows the persona picker; "oidc" shows the verified identity. */
   authMode?: string;
   me?: Persona | null;
@@ -21,7 +20,6 @@ export function Masthead(props: {
     <header className="masthead">
       <span className="title">Cloud Operations Agent</span>
       <span className="id">
-        <span className="pill dim">{props.mode} mode</span>
         {props.authMode === "oidc" && (
           <span className="pill dim" title={current?.email ?? ""}>
             {current ? `${current.name || current.sub}` : "sign-in required"}

@@ -9,7 +9,7 @@
 # file: placement is discovered live from Prometheus series (FR-CTX-2).
 #
 # `instances` below exist for the mock world builder and live-mode hints
-# only; the agent always verifies placement through obs__find_app_placements.
+# only; the agent always verifies placement through ocp__verify_placement.
 # ============================================================================
 
 version: 1
