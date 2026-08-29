@@ -32,6 +32,7 @@ kubeconfig*
 *.swp
 
 # Local run artifacts
+backend/evals/out/
 *.log
 .cache/
 .claude/
