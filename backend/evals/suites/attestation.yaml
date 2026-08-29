@@ -1,0 +1,111 @@
+# ============================================================================
+# Suite: cluster health attestation.
+#
+# Schema reference: backend/evals/suites/context-resolution.yaml.
+#
+# One case per verdict the battery can reach, driven through the explicit
+# cluster scope ("attest <cluster>") so the fleet's shape is the only variable.
+# The fifth case is about the verdict NOT being recomputed: within one thread
+# an attestation is cached for its TTL, and a scenario is the only place that
+# can prove it, because a cache hit is visible only as a phase tick that did
+# not happen.
+# ============================================================================
+
+suite: attestation
+description: >-
+  Every verdict the health battery can produce, and the per-thread freshness
+  cache that decides when it is recomputed.
+
+defaults:
+  persona:
+    sub: platform-sre
+    name: Platform SRE
+    email: platform.sre@example.internal
+    groups: [retail-sre]
+  fleet:
+    base: default
+
+cases:
+  - id: healthy-cluster
+    description: >-
+      Two ready nodes and nothing else wrong: healthy, and no Application 360
+      because the scope is a cluster, not an application.
+    turns:
+      - user: attest acm-spoke-1a
+        expect:
+          outcome: resolved
+          context:
+            scope: cluster
+            clusters: [acm-spoke-1a]
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: false }
+          phases: [attestation:start, attestation:done, narrative:start]
+
+  - id: degraded-not-ready-node
+    description: >-
+      A NotReady worker under a crash-looping application. The node is what
+      makes the verdict degraded; the crash loop is the application finding
+      that rides alongside it, and triage exists to keep the two apart.
+    turns:
+      - user: attest acm-spoke-2a
+        expect:
+          outcome: resolved
+          context:
+            scope: cluster
+            clusters: [acm-spoke-2a]
+          attestation: { acm-spoke-2a: degraded }
+          live_only:
+            narrative_must_mention: [{ pattern: "not ?ready|degraded", regex: true }]
+            judge: { groundedness: 0.85, completeness: 0.8, protocol_tone: 0.9 }
+
+  - id: unattestable-unreachable-api
+    description: >-
+      An API server that refuses the connection is unattestable, never
+      degraded (FR-ATT-5, contract invariant 3). "Could not be asked" and
+      "asked and unhealthy" have to stay distinguishable.
+    turns:
+      - user: attest acm-hub-2
+        expect:
+          outcome: resolved
+          context:
+            scope: cluster
+            clusters: [acm-hub-2]
+          attestation: { acm-hub-2: unattestable }
+          live_only:
+            # The confidence cap: it may not be called healthy and it may not
+            # be called unhealthy.
+            narrative_must_not_mention:
+              - { pattern: "cluster is healthy", regex: false }
+            judge: { groundedness: 0.9, completeness: 0.8, protocol_tone: 0.9 }
+
+  - id: maintenance-cordoned-node
+    description: >-
+      A cordoned worker is planned work, so the verdict is maintenance rather
+      than degraded. Paging someone for a drain is how an operator learns to
+      ignore the agent.
+    turns:
+      - user: attest acm-spoke-1b
+        expect:
+          outcome: resolved
+          context:
+            scope: cluster
+            clusters: [acm-spoke-1b]
+          attestation: { acm-spoke-1b: maintenance }
+
+  - id: ttl-reuse-within-thread
+    description: >-
+      FR-ATT-7. The second question about the same cluster inside the TTL
+      reuses the verdict: the attestation card is still emitted, but the
+      battery does not run again, which shows as a missing `attestation:start`
+      tick.
+    turns:
+      - user: attest acm-spoke-1a
+        expect:
+          outcome: resolved
+          attestation: { acm-spoke-1a: healthy }
+          phases: [attestation:start, attestation:done, narrative:start]
+      - user: attest acm-spoke-1a again please
+        expect:
+          outcome: resolved
+          attestation: { acm-spoke-1a: healthy }
+          phases: [attestation:done, narrative:start]

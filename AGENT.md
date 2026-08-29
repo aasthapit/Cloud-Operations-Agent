@@ -218,7 +218,26 @@ Everything emits OpenTelemetry when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; every 
 There is no metrics/Prometheus path any more: checks that only metrics could answer (alert feeds, latency SLOs, container-level usage) were removed rather than faked, and Application 360's observability section states that honestly.
 If production wants them back, the shape is a new observability MCP behind the gateway (one `servers.yaml` entry + battery checks + a skill file), not a change to any existing component.
 
-## 9. Contract invariants worth protecting
+## 9. Eval harness
+
+Every interface above is a claim about behavior, and the eval harness ([backend/src/cloudops/evals/](backend/src/cloudops/evals/)) is where those claims get exercised as scenarios rather than as unit assertions.
+It plugs into the interfaces, not around them.
+
+- **Identity (section 3).** A scenario's `persona` is the claim shape `{sub, name, email, groups[]}` and it is seeded exactly where the A2A hop seeds it, `RunConfig.custom_metadata["a2a_metadata"]["claims"]`, so ownership resolution is exercised through the production identity seam.
+- **The fence protocol (section 3).** The harness consumes the agent's output the way the BFF does: it parses `cloudops-*` fences out of the text stream and treats the rest as narrative.
+  That makes the fence contract testable from the outside, and it is how the always-on invariant is scored - fences are attributed to their emitting event's author, so a typed payload the model wrote is visible as a failure.
+- **The gateway (section 5).** An ASGI recorder in front of the real gateway logs every `tools/call`, which is what the analyst's tool budget is scored against.
+  The deterministic phases' calls and the model's are told apart by the `narrative` phase tick, since the orchestrator closes its gateway session before the analyst runs.
+- **The MCP servers (sections 6 and 7).** The registry MCP is the production server over an in-memory MongoDB the real seeder loaded from the scenario's own config plane; the OpenShift MCP is the production server over a `LiveOpenShiftBackend` whose only substitution is the cluster socket (`build_server(backend=...)`, the seam section 7 already describes).
+- **The config plane (section 4).** Each scenario gets a copy of the committed `config/`, with only the registry downstream URL and (when the scenario overrides it) `fleet/applications.yaml` rewritten.
+  Batteries, prompts, messages and gateway policy are the shipped files, so a scenario measures the shipped configuration.
+- **Inference (section 8).** `--mode fake` selects the `provider: fake` seam; `--mode live` uses whatever `config/models.yaml` names.
+  The LLM judges reach the same OpenAI-compatible endpoint through a small direct client rather than through ADK, so the thing under test is not in the path of its own measurement.
+
+Suites are YAML under `backend/evals/suites/` with the schema documented in `context-resolution.yaml`; judge prompts are Markdown under `backend/evals/judges/`.
+Adding coverage for a new domain is the same shape as adding the domain itself: a `servers.yaml` entry, a battery, a skill file - and a suite.
+
+## 10. Contract invariants worth protecting
 
 These are the load-bearing rules; break them and distant components fail in quiet ways.
 

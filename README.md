@@ -212,14 +212,46 @@ Each user turn is one trace spanning all five services, tagged with `thread.id`,
 ## Development
 
 ```bash
-make check    # ruff + mypy + tsc + pytest (118 tests)
+make check    # ruff + mypy + tsc + pytest (170 tests)
 make test
+make eval     # scenario evals against the fake model (see "Evaluating the agent")
 ```
 
 The suite is hermetic: it needs no Ollama, no Docker, and no pre-running service, and it never binds a dev port.
 The one test that talks to real clusters is marked `live_smoke` and skips unless `CLOUDOPS_LIVE_SMOKE=1`, so `make test` is unaffected by whether the kind fleet is running.
 [backend/tests/test_e2e_triage.py](backend/tests/test_e2e_triage.py) boots both MCP servers and the gateway in-process on kernel-assigned ports, drives a full triage turn through the fake model, and asserts the typed payloads the console consumes.
 
-Layout: [backend/src/cloudops/](backend/src/cloudops/) (agent, gateway, MCP servers, shared infra), [frontend/](frontend/) (Express BFF + React SPA), [docs/](docs/) (PRD, user flows, research notes, source checklist transcription).
+The test doubles and the in-process service harness live in [backend/src/cloudops/testkit/](backend/src/cloudops/testkit/) rather than under `tests/`, because the eval harness below builds its worlds from exactly the same fixtures.
+One implementation of a double is the only way two consumers of it cannot disagree.
+
+Layout: [backend/src/cloudops/](backend/src/cloudops/) (agent, gateway, MCP servers, testkit, evals, shared infra), [frontend/](frontend/) (Express BFF + React SPA), [docs/](docs/) (PRD, user flows, research notes, source checklist transcription).
+
+## Evaluating the agent
+
+The test suite asks whether the code does what it was written to do.
+The eval harness asks a different question: does the agent BEHAVE, across a conversation, the way the product says it should.
+
+```bash
+make eval        # every suite against the fake model: hermetic, ~1 minute, the CI gate
+make eval-live   # the same suites against the model in config/models.yaml, with LLM judges
+```
+
+Each scenario boots the whole backend in-process on kernel-assigned ports - the OpenShift MCP over canned cluster fixtures, the production fleet registry MCP over an in-memory MongoDB the real seeder loaded, the real gateway, the real orchestrator and check engine, the real analyst - and sends the scenario's turns down the same path an A2A request takes.
+Nothing about the route is simulated; in fake mode the only substitution is the model.
+
+Scenarios are YAML under [backend/evals/suites/](backend/evals/suites/), and the schema is documented at the top of [context-resolution.yaml](backend/evals/suites/context-resolution.yaml).
+A case names a persona, a fleet, an application registry, and a conversation, and each turn declares what must come out of it: the resolved context fields, the attestation verdict per cluster, whether an Application 360 report landed, the phase sequence, the analyst's tool budget, placement verification outcomes, and narrative content.
+Adding coverage is a YAML edit.
+
+The two modes differ in what can be asserted, not in what runs.
+In `fake` mode the analyst is the deterministic `FakeLlm`, so its answer is one fixed sentence and only deterministic metrics are scored; this is the gate CI runs, and it needs no Ollama, no Docker, and no network.
+In `live` mode the analyst is the configured model, so the scenario's `live_only` expectations apply and three LLM judges score the narrative: groundedness (is every factual claim supported by the evidence that turn produced), completeness (did it answer the question), and protocol tone (prose, no raw JSON, no invented tool names).
+The judge talks to the same OpenAI-compatible endpoint through a small direct client, and its prompts are config, not code, in [backend/evals/judges/](backend/evals/judges/).
+
+Outputs land in `backend/evals/out/` (gitignored): `scorecard.json` per suite, case, turn and metric, and `report.md` with a summary table and, for every failure, the offending narrative excerpt next to the evidence it should have been grounded in.
+The exit code is nonzero when any case fails.
+
+One expectation is always on and never declared in a scenario: only the deterministic runtime may emit `cloudops-*` fences.
+It is the first of the contract invariants in [AGENT.md](AGENT.md), and an invariant that has to be opted into is not one.
 
 Branches: `main` (documents + approved milestones), `develop` (integration), `UAT` (cut from develop for product-owner review).

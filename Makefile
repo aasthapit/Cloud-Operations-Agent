@@ -4,7 +4,7 @@
 # and a tool-capable model: `ollama pull qwen3:4b`).
 
 .PHONY: setup dev check test lint typecheck telemetry-up telemetry-down live-prep live-smoke \
-	mongo-up mongo-down mongo-seed run-ocp-mcp run-registry-mcp
+	mongo-up mongo-down mongo-seed run-ocp-mcp run-registry-mcp eval eval-live
 
 setup:  ## install backend (uv) and frontend (npm) dependencies
 	cd backend && uv sync
@@ -20,6 +20,12 @@ test:
 
 lint:
 	cd backend && uv run ruff check src tests
+
+eval:  ## scenario evals against the fake model: hermetic, deterministic, the CI gate
+	cd backend && uv run python -m cloudops.evals --mode fake
+
+eval-live:  ## the same scenarios against the configured model, with the LLM judges
+	cd backend && uv run python -m cloudops.evals --mode live --judge auto
 
 typecheck:
 	cd backend && uv run mypy src

@@ -1,0 +1,37 @@
+# ============================================================================
+# Suite: smoke.
+#
+# Schema reference: backend/evals/suites/context-resolution.yaml.
+#
+# One case, one turn, the shortest path that still touches every layer: real
+# MCP servers, real gateway, real orchestrator, real check engine, fake model.
+# backend/tests/test_evals.py runs exactly this suite through the public entry
+# point, so CI exercises the harness itself and not only the agent.
+# ============================================================================
+
+suite: smoke
+description: One resolution end to end - the harness's own health check.
+
+cases:
+  - id: resolves-and-reports
+    description: >-
+      Claims resolve the application, the placement verifies, the host
+      cluster attests, and the report lands.
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    fleet:
+      base: default
+    turns:
+      - user: why is my app flaky in prod?
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+            environment: prod
+            clusters: [acm-spoke-1a]
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true, count: 1 }
+          max_tool_calls: 0
