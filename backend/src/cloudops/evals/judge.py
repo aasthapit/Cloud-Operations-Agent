@@ -68,6 +68,11 @@ class JudgeVerdict:
         payload: dict[str, Any] = {"reason": self.reason}
         if self.claims:
             payload["claims"] = self.claims[:12]
+        if self.score == 0.0 and self.raw:
+            # A zero is either a damning verdict or a judge malfunction; the
+            # raw tail is what tells the reader which, so a zero always
+            # carries it.
+            payload["judge_raw_tail"] = self.raw[-500:]
         return payload
 
 
@@ -76,7 +81,7 @@ class JudgeConfig:
     api_base: str
     model: str
     temperature: float = 0.0
-    max_tokens: int = 1200
+    max_tokens: int = 4096
     timeout_s: float = 300.0
 
 
@@ -104,7 +109,7 @@ def judge_config(config_dir: Path | None = None) -> JudgeConfig:
         api_base=api_base,
         model=model,
         temperature=float(judge.get("temperature", 0.0)),
-        max_tokens=int(judge.get("max_output_tokens", 1200)),
+        max_tokens=int(judge.get("max_output_tokens", 4096)),
         timeout_s=float(judge.get("timeout_seconds", 300)),
     )
 
@@ -205,4 +210,16 @@ class Judge:
                 raise JudgeUnavailable(f"judge endpoint unreachable: {exc}") from exc
         payload = response.json()
         choices = payload.get("choices") or [{}]
-        return str((choices[0].get("message") or {}).get("content") or "")
+        message = choices[0].get("message") or {}
+        content = str(message.get("content") or "")
+        if not content.strip():
+            # Reasoning models can spend the whole budget thinking and hand
+            # back an empty content with the deliberation in a side field;
+            # that text sometimes carries the JSON and always carries the
+            # diagnosis, so it beats an empty string either way.
+            content = str(message.get("reasoning")
+                          or message.get("reasoning_content") or "")
+            log.warning("evals.judge_empty_content",
+                        finish_reason=choices[0].get("finish_reason"),
+                        fallback_chars=len(content))
+        return content
