@@ -140,6 +140,15 @@ def main() -> int:
 
         t.run(f"cluster {cluster}", probe)
 
+    def readyz_probe() -> tuple[bool, str, Any]:
+        info = ocp.get_cluster_info(HEALTHY_SPOKE)
+        ok = info["readyz_probed"] is True and info["readyz_ok"] is True
+        return ok, str(info["readyz_summary"]), {
+            k: info[k] for k in ("readyz_probed", "readyz_ok", "readyz_failing")
+        }
+
+    t.run(f"readyz {HEALTHY_SPOKE}", readyz_probe)
+
     def na_contract() -> tuple[bool, str, Any]:
         results = {
             "ClusterVersion": ocp.get_cluster_version(HEALTHY_SPOKE),

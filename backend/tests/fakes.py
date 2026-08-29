@@ -199,6 +199,7 @@ class ClusterFixture:
     nodes: list[dict[str, Any]] = field(default_factory=lambda: [node("cp-1")])
     namespaces: dict[str, NamespaceFixture] = field(default_factory=dict)
     version: str = "v1.33.7"
+    readyz_failing: list[str] = field(default_factory=list)
     reachable: bool = True
 
     def ns(self, name: str) -> NamespaceFixture:
@@ -234,6 +235,17 @@ def fake_kube(fixture: ClusterFixture) -> KubeClient:
         if not fixture.reachable:
             raise httpx.ConnectError("connection refused", request=request)
         path = request.url.path
+        if path == "/readyz":
+            subchecks = ["ping", "etcd", "informer-sync"]
+            lines = [
+                (f"[-]{name} failed: reason withheld" if name in fixture.readyz_failing
+                 else f"[+]{name} ok")
+                for name in sorted(set(subchecks) | set(fixture.readyz_failing))
+            ]
+            failed = bool(fixture.readyz_failing)
+            lines.append("readyz check failed" if failed else "readyz check passed")
+            return httpx.Response(500 if failed else 200, content="\n".join(lines),
+                                  headers={"content-type": "text/plain"})
         selector = request.url.params.get("labelSelector")
         body = _route(fixture, path, selector)
         if body is None:

@@ -156,6 +156,10 @@ class LiveOpenShiftBackend:
             # surface as reachable=false, not as a tool error, or the battery
             # loses the difference between "down" and "could not be asked".
             reachable = False
+        readyz = self._readyz(client) if reachable else {
+            "readyz_probed": False, "readyz_ok": None, "readyz_failing": [],
+            "readyz_summary": "not probed: cluster unreachable",
+        }
         return {
             "cluster": cluster,
             "reachable": reachable,
@@ -167,6 +171,54 @@ class LiveOpenShiftBackend:
             "region": entry.get("region"),
             "environment": entry.get("environment"),
             "labels": dict(entry.get("labels") or {}),
+            **readyz,
+        }
+
+    @staticmethod
+    def _readyz(client: KubeClient) -> dict[str, Any]:
+        """Component-level control-plane readiness from ``/readyz?verbose``.
+
+        The verbose form lists every named sub-check (``[+]etcd ok`` /
+        ``[-]etcd failed``), so an unhealthy control plane names WHAT is
+        failing instead of only that it is. Two honesty rules:
+
+        - a failing readyz answers HTTP 500 with the breakdown still in the
+          body, so the 500 is parsed, not treated as transport failure;
+        - the endpoint is authorization-gated (a nonResourceURL get), and a
+          401/403 reads as "not permitted", never as unhealthy - missing
+          permission is not evidence about the cluster.
+        """
+        try:
+            text = client.get_text("/readyz", verbose="true")
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (401, 403):
+                return {
+                    "readyz_probed": False, "readyz_ok": None, "readyz_failing": [],
+                    "readyz_summary": (
+                        f"readyz not permitted ({exc.response.status_code}); "
+                        "grant get on the /readyz nonResourceURL for sub-check detail"
+                    ),
+                }
+            text = exc.response.text
+        except (httpx.HTTPError, OSError):
+            return {
+                "readyz_probed": False, "readyz_ok": None, "readyz_failing": [],
+                "readyz_summary": "readyz did not answer",
+            }
+        checks = [line for line in text.splitlines() if line.startswith(("[+]", "[-]"))]
+        failing = sorted(
+            line[3:].split(" ", 1)[0].removesuffix(":") for line in checks
+            if line.startswith("[-]")
+        )
+        ok = bool(checks) and not failing
+        summary = (
+            f"readyz: {len(checks) - len(failing)}/{len(checks)} sub-checks ok"
+            + (f"; failing: {', '.join(failing)}" if failing else "")
+            if checks else "readyz answered without a sub-check breakdown"
+        )
+        return {
+            "readyz_probed": True, "readyz_ok": ok if checks else None,
+            "readyz_failing": failing, "readyz_summary": summary,
         }
 
     def get_cluster_version(self, cluster: str) -> dict[str, Any]:

@@ -158,6 +158,39 @@ def test_cluster_info_reports_unreachable_rather_than_raising(
     assert ocp.get_cluster_info(HEALTHY)["reachable"] is True
 
 
+def test_cluster_info_carries_readyz_subchecks(ocp: LiveOpenShiftBackend) -> None:
+    """/readyz?verbose rides on the reachability check so an unhealthy control
+    plane names the failing sub-check instead of only that it is failing."""
+    info = ocp.get_cluster_info(HEALTHY)
+    assert info["readyz_probed"] is True
+    assert info["readyz_ok"] is True
+    assert info["readyz_failing"] == []
+    assert "sub-checks ok" in info["readyz_summary"]
+
+
+def test_cluster_info_readyz_failure_names_the_subcheck(
+    ocp: LiveOpenShiftBackend, fleet: FakeFleet
+) -> None:
+    """A failing readyz answers HTTP 500 with the breakdown in the body; the
+    500 is evidence, not a transport error."""
+    fleet.fixture(HEALTHY).readyz_failing.append("etcd")
+    info = ocp.get_cluster_info(HEALTHY)
+    assert info["readyz_ok"] is False
+    assert info["readyz_failing"] == ["etcd"]
+    assert "failing: etcd" in info["readyz_summary"]
+
+
+def test_cluster_info_readyz_not_probed_when_unreachable(
+    ocp: LiveOpenShiftBackend
+) -> None:
+    """No permission or no answer must never read as unhealthy: the rule field
+    stays empty so nothing in the battery can fire on absence of evidence."""
+    info = ocp.get_cluster_info(UNREACHABLE)
+    assert info["readyz_probed"] is False
+    assert info["readyz_ok"] is None
+    assert info["readyz_failing"] == []
+
+
 def test_nodes_separate_not_ready_from_cordoned(ocp: LiveOpenShiftBackend, world: Any) -> None:
     world[HEALTHY].nodes = [
         node("cp-1"),

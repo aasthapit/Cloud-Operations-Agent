@@ -71,6 +71,14 @@ checks:
         op: falsy
         outcome: unattestable
         reason: cluster API did not respond, so nothing about this cluster could be attested
+      # Component-level readiness rides on the same tool call: /readyz?verbose
+      # names the failing control-plane sub-check (etcd, informers, hooks).
+      # readyz_failing stays empty when the probe was not permitted or did not
+      # answer, so this rule only ever fires on positive evidence.
+      - path: readyz_failing
+        op: not_empty
+        outcome: fail
+        reason: the API server's own /readyz reports failing sub-checks (see readyz_summary)
 
   - id: cluster-version
     name: ClusterVersion

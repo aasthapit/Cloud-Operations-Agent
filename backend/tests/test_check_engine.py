@@ -209,6 +209,18 @@ class TestAttestationAgainstTheFleet:
             assert statuses[check_id] is CheckStatus.PASS, check_id
 
     @pytest.mark.asyncio
+    async def test_failing_readyz_subcheck_degrades_the_cluster(self, battery, gateway):
+        """The API server's own /readyz?verbose breakdown is battery evidence:
+        a failing sub-check degrades the cluster and names itself."""
+        gateway.fleet.fixture(HEALTHY).readyz_failing.append("etcd")
+        try:
+            [att] = await run_attestation(battery, [HEALTHY], gateway, "v1")
+        finally:
+            gateway.fleet.fixture(HEALTHY).readyz_failing.clear()
+        assert att.verdict is ClusterVerdict.DEGRADED
+        assert any("readyz" in s for s in att.signals)
+
+    @pytest.mark.asyncio
     async def test_not_ready_node_degrades_the_cluster(self, battery, gateway):
         [att] = await run_attestation(battery, [DEGRADED], gateway, "v1")
         assert att.verdict is ClusterVerdict.DEGRADED
