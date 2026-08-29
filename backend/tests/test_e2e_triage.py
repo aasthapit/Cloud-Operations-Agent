@@ -114,9 +114,7 @@ async def stack(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runne
     """
     ports = {name: free_port() for name in ("ocp", "reg", "gateway")}
     config_dir = config_dir_with_registry(tmp_path_factory.mktemp("plane"), ports["reg"])
-    monkeypatch = pytest.MonkeyPatch()
-    with monkeypatch.context() as mp, service_env(
-        mp,
+    with service_env(
         CLOUDOPS_CONFIG_DIR=str(config_dir),
         CLOUDOPS_MCP_OPENSHIFT_PORT=str(ports["ocp"]),
         CLOUDOPS_GATEWAY_PORT=str(ports["gateway"]),

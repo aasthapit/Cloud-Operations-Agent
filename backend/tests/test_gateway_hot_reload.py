@@ -132,13 +132,13 @@ async def test_a_rejected_edit_keeps_the_running_catalog(tmp_path: Path, downstr
 
 @pytest.mark.asyncio
 async def test_registered_tools_are_callable_through_the_served_gateway(
-    tmp_path: Path, downstream: str, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, downstream: str
 ) -> None:
     """The same registry, through the gateway's real ASGI app."""
     write_registry(tmp_path / "gateway" / "servers.yaml", downstream, enabled=True)
     gateway_port = free_port()
 
-    with service_env(monkeypatch, CLOUDOPS_CONFIG_DIR=str(tmp_path),
+    with service_env(CLOUDOPS_CONFIG_DIR=str(tmp_path),
                      CLOUDOPS_GATEWAY_PORT=str(gateway_port)):
         from cloudops.gateway.app import build_app
 
