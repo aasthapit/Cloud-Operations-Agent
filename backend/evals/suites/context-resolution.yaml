@@ -1,0 +1,291 @@
+# ============================================================================
+# Suite: context resolution.
+#
+# THE SCENARIO SCHEMA IS DOCUMENTED HERE. Every suite file under this
+# directory uses it; the executable definition is
+# backend/src/cloudops/evals/suite.py.
+#
+# A suite is DATA. It names personas, fleets, conversations, and what each
+# turn must produce. It never names a Python symbol, so adding coverage is a
+# YAML edit.
+#
+#   suite            identifier, also the --suite <name> selector (file stem)
+#   description      one line, rendered at the top of the suite's report section
+#   judge_threshold  default minimum score for every LLM judge (default 0.8)
+#   defaults         a mapping shallow-merged into every case below, so a
+#                    suite can declare one fleet and one persona once. Sharing
+#                    a fleet is not only brevity: consecutive cases with the
+#                    same world, registry and inference target share one
+#                    booted stack, and booting five services is the expensive
+#                    part of a run.
+#   cases            the scenarios
+#
+# Each case:
+#
+#   id               stable identifier, shown in the report and the scorecard
+#   description      what behavior this case is defending
+#   modes            [fake, live] by default; narrow it to run a case in one
+#                    mode only (a case that needs a real model to fail, say)
+#   persona          identity claims {sub, name, email, groups[]}: the exact
+#                    shape the BFF stamps into A2A metadata in both dev and
+#                    OIDC mode
+#   fleet            which clusters exist and what shape they are in
+#     base           `default` starts from the shared canned fleet in
+#                    cloudops.testkit (one healthy spoke, one degraded spoke,
+#                    one cordoned spoke, one unreachable cluster, two quiet
+#                    ones); `empty` builds only what is declared
+#     clusters       per cluster: `kind` (healthy | degraded-crashloop |
+#                    unreachable | cordoned | pressure) and `namespaces`
+#                    {name: {app_label, replicas, crashloop?}}. On the default
+#                    base, declaring only namespaces ADDS them to the shared
+#                    cluster rather than redefining it.
+#   registry         the application catalog
+#     base           `committed` keeps config/fleet/applications.yaml,
+#                    `empty` starts from nothing
+#     apps           rows appended, or replacing a committed row of the same
+#                    application name: {application, app_id, lob, app_label,
+#                    owner_groups[], criticality, instances[]}. This one file
+#                    is both what the orchestrator reads for ownership and
+#                    what the seeder loads into the scenario's in-memory
+#                    Mongo, so a scenario cannot describe a fleet the registry
+#                    disagrees with.
+#   turns            ordered user messages, all in ONE conversation thread, so
+#                    a case can exercise a clarification reply, a mid-thread
+#                    scope change, or the attestation TTL
+#   inference_api_base
+#                    point the analyst somewhere unreachable, to exercise the
+#                    F8 narrative degrade. Only meaningful in live mode.
+#
+# Each turn's `expect` may carry any of:
+#
+#   outcome                  resolved | clarify:application | clarify:environment |
+#                            clarify:cluster | onboarding
+#   context                  field: value against the context fence
+#                            (application, environment, clusters, scope,
+#                            app_label, outside_registered_set,
+#                            environment_assumed, placement_note)
+#   attestation              {cluster: healthy|maintenance|degraded|unattestable}
+#   app360                   {emitted, count, overall_status}; whenever a report
+#                            is expected its 18 sections are checked too
+#   placements               per resolved instance: {cluster, namespace,
+#                            verified, reachable, pod_count} - what
+#                            ocp__verify_placement actually answered (FR-CTX-2)
+#   phases                   the exact phase-tick sequence, e.g.
+#                            [attestation:start, attestation:done, narrative:start]
+#   fence_kinds              the exact set of fence kinds the turn emitted
+#   clarify_options          how many options the one question offered
+#   max_tool_calls           ceiling on tool calls made by the ANALYST (the
+#                            deterministic phases' calls are counted separately)
+#   error                    {phase, reason, correlation_id} against an error fence
+#   narrative_must_mention   substrings (or {pattern, regex: true}) the answer
+#   narrative_must_not_mention   must or must not contain
+#   live_only                the same two mention lists plus `judge`
+#                            {groundedness, completeness, protocol_tone}
+#                            minimums, scored ONLY when a real model wrote the
+#                            narrative
+#
+# On live_only: in fake mode the analyst is FakeLlm, whose answer is one fixed
+# sentence, so asserting prose there would pin the double instead of the
+# product. Everything deterministic is asserted in BOTH modes, and that is
+# what the CI gate runs. Runtime copy the orchestrator itself speaks
+# (onboarding, clarification questions) is deterministic and IS asserted in
+# both modes - see the registry suite.
+#
+# One expectation is always on and never declared: only the deterministic
+# runtime may emit cloudops-* fences (AGENT.md section 10, invariant 1). An
+# invariant that has to be opted into is not one.
+# ============================================================================
+
+suite: context-resolution
+description: >-
+  Claims to application to placement, and the four honest ways that can end:
+  resolved, one question, an assumption disclosed, or onboarding.
+
+defaults:
+  fleet:
+    base: default
+    clusters:
+      # The registry places ssop on the hub; the canned fleet does not deploy
+      # it there, so the scenario adds the workload that makes the placement
+      # verifiable.
+      acm-hub-1:
+        namespaces:
+          ssop-prod: { app_label: ssop, replicas: 2 }
+      # Same for catalog's nonprod instance, which the mid-thread scope
+      # override moves to.
+      acm-spoke-2b:
+        namespaces:
+          catalog-dev: { app_label: catalog, replicas: 1 }
+
+cases:
+  - id: zero-question-triage
+    description: >-
+      F1. One registered application and a stated environment: the turn
+      resolves from claims alone, verifies the placement against the cluster,
+      attests the host, and produces the report without asking anything.
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    turns:
+      - user: why is my app flaky in prod?
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+            environment: prod
+            clusters: [acm-spoke-1a]
+            environment_assumed: false
+            outside_registered_set: false
+          placements:
+            - { cluster: acm-spoke-1a, namespace: payments-prod, verified: true, pod_count: 2 }
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true, count: 1 }
+          phases:
+            [attestation:start, attestation:done, app360:start, app360:done, narrative:start]
+          # The first resolution hands the analyst every piece of evidence it
+          # needs; reaching for a tool means the grounding did not land.
+          max_tool_calls: 0
+          live_only:
+            narrative_must_mention: [payments-api, acm-spoke-1a]
+            judge: { groundedness: 0.85, completeness: 0.8, protocol_tone: 0.9 }
+
+  - id: application-ambiguity-asks-once
+    description: >-
+      F2. Six registered applications and none named: exactly one question,
+      with enumerated options, and not a single check runs (FR-CTX-4).
+    persona:
+      sub: platform-sre
+      name: Platform SRE
+      email: platform.sre@example.internal
+      groups: [retail-sre]
+    turns:
+      - user: is my stuff healthy?
+        expect:
+          outcome: clarify:application
+          clarify_options: 6
+          fence_kinds: [clarify]
+          phases: []
+          app360: { emitted: false }
+
+  - id: environment-default-assumed
+    description: >-
+      FR-CTX-8. A sentence naming neither application nor environment still
+      runs the whole pipeline; the assumption rides on the context card
+      instead of costing the user their one question.
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    turns:
+      - user: is my app down
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+            environment: prod
+            environment_assumed: true
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true }
+
+  - id: mid-thread-scope-override
+    description: >-
+      FR-CTX-7. Naming a different environment mid-thread moves the scope and
+      re-resolves against the new cluster, rather than answering the old
+      question again.
+    persona:
+      sub: platform-sre
+      name: Platform SRE
+      email: platform.sre@example.internal
+      groups: [retail-sre]
+    turns:
+      - user: how is catalog doing in prod?
+        expect:
+          outcome: resolved
+          context:
+            application: catalog
+            environment: prod
+            clusters: [acm-spoke-1a]
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true, count: 1 }
+      - user: what about catalog in nonprod?
+        expect:
+          outcome: resolved
+          context:
+            application: catalog
+            environment: nonprod
+            clusters: [acm-spoke-2b]
+          placements:
+            - { cluster: acm-spoke-2b, namespace: catalog-dev, verified: true, pod_count: 1 }
+          attestation: { acm-spoke-2b: healthy }
+          # The scope changed, so the previous report does not carry over and
+          # a fresh one is produced for the new instance.
+          app360: { emitted: true, count: 1 }
+
+  - id: ssop-by-short-code
+    description: >-
+      The self-service portal is asked about by the short code a human types.
+      Resolution has to get that right from the registry without a cluster
+      round trip, and disclose the assumed environment.
+    persona:
+      sub: platform-owner
+      name: Platform owner
+      email: platform.owner@example.internal
+      groups: [platform-sre]
+    turns:
+      - user: is app SSOP down?
+        expect:
+          outcome: resolved
+          context:
+            application: ssop
+            app_label: ssop
+            environment: prod
+            clusters: [acm-hub-1]
+            environment_assumed: true
+          placements:
+            - { cluster: acm-hub-1, namespace: ssop-prod, verified: true, pod_count: 2 }
+          attestation: { acm-hub-1: healthy }
+          app360: { emitted: true, count: 1 }
+
+  - id: unknown-app-onboarding
+    description: >-
+      F3. An account the registry maps to no application gets onboarding
+      guidance and nothing else - no checks, no context card, no report
+      (FR-CTX-5).
+    persona:
+      sub: new-joiner
+      name: New joiner
+      email: new.joiner@example.internal
+      groups: [newcomers]
+    turns:
+      - user: is anything broken right now?
+        expect:
+          outcome: onboarding
+          fence_kinds: []
+          phases: []
+          app360: { emitted: false }
+          narrative_must_mention:
+            - no registered applications
+
+  - id: guest-outside-registered-set
+    description: >-
+      F3, the other half. A user with no applications who NAMES one still gets
+      a real answer, flagged as outside their registered set: visibility beats
+      ceremony.
+    persona:
+      sub: guest
+      name: Guest
+      email: guest@example.internal
+      groups: []
+    turns:
+      - user: how is payments-api doing in prod?
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+            environment: prod
+            outside_registered_set: true
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true }

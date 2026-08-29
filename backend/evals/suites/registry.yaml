@@ -1,0 +1,91 @@
+# ============================================================================
+# Suite: the fleet registry, and the line it must not cross.
+#
+# Schema reference: backend/evals/suites/context-resolution.yaml.
+#
+# Contract invariant 2: the registry PROPOSES and the cluster CONFIRMS, so
+# nothing is ever reported as running on registry data alone. These cases
+# come at that from both sides - a blast-radius question the registry is the
+# only source for, and a registry row no cluster backs.
+#
+# Blast-radius phrasing is asymmetric between modes on purpose. The registry
+# lookup is an ANALYST tool call, and the fake model never calls a tool, so
+# fake mode asserts only that the turn completes with a sane scope; naming
+# the co-tenant applications is a live-mode expectation.
+# ============================================================================
+
+suite: registry
+description: >-
+  Registry-shaped questions (who else is here, what breaks if this goes) and
+  the honesty a stale placement row demands.
+
+defaults:
+  fleet:
+    base: default
+
+cases:
+  - id: blast-radius-phrasing
+    description: >-
+      "What else runs on this cluster" is a registry question, not a cluster
+      question. In fake mode the bar is that the turn completes with a scope
+      that still makes sense; in live mode the answer has to name the
+      applications the registry actually places there.
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    turns:
+      - user: what applications run on cluster acm-spoke-1a?
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+            environment: prod
+            clusters: [acm-spoke-1a]
+          attestation: { acm-spoke-1a: healthy }
+          live_only:
+            narrative_must_mention: [catalog, checkout]
+            judge: { groundedness: 0.85, completeness: 0.8, protocol_tone: 0.9 }
+
+  - id: lob-blast-radius
+    description: >-
+      The same tool surface asked the other way: what is affected if a spoke
+      is lost. The registry is the only thing that can answer it, and the
+      answer has to stay labelled as belief, not observation.
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    turns:
+      - user: if acm-spoke-2a goes down, what is the blast radius?
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+          live_only:
+            narrative_must_mention: [payments-api]
+            judge: { groundedness: 0.85, completeness: 0.8, protocol_tone: 0.9 }
+
+  - id: stale-registry-row-honesty
+    description: >-
+      FR-CTX-2 at its sharpest. The registry places refunds on the healthy
+      spoke and no pod there carries the label, so the turn must say the row
+      is stale rather than report the application as running. The copy is the
+      runtime's own, not the model's, so this is asserted in both modes.
+    persona:
+      sub: platform-sre
+      name: Platform SRE
+      email: platform.sre@example.internal
+      groups: [retail-sre]
+    turns:
+      - user: how is refunds doing?
+        expect:
+          outcome: onboarding
+          fence_kinds: []
+          phases: []
+          app360: { emitted: false }
+          narrative_must_mention:
+            - registry entry is stale
+            - refunds-prod

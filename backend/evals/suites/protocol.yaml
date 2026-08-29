@@ -1,0 +1,99 @@
+# ============================================================================
+# Suite: the wire contract between the agent and any UI.
+#
+# Schema reference: backend/evals/suites/context-resolution.yaml.
+#
+# The fence protocol is what lets a new UI - a Slack bot, a CLI, another
+# console - be an A2A client plus a fence parser and nothing else. Three
+# things have to hold for that: the runtime emits every typed payload and the
+# model emits none, a quick-pick reply resolves without re-asking, and a lost
+# narrative degrades into an error fence carrying a correlation id rather
+# than into a crashed turn.
+# ============================================================================
+
+suite: protocol
+description: >-
+  Fence discipline, clarification round trips, and what a turn looks like when
+  the narrative tier is the thing that fails.
+
+defaults:
+  fleet:
+    base: default
+
+cases:
+  - id: fence-discipline
+    description: >-
+      A full resolution emits exactly the four payload kinds a console
+      renders, all from the deterministic runtime. The model-authored-fence
+      check runs on every turn in every suite; this case pins the positive
+      side of it - the runtime really does emit them.
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    turns:
+      - user: why is payments-api unhealthy in prod?
+        expect:
+          outcome: resolved
+          fence_kinds: [app360, attestation, context, phase]
+          max_tool_calls: 0
+          live_only:
+            # Fences in the prose would be the model writing the protocol.
+            narrative_must_not_mention:
+              - { pattern: "```cloudops-", regex: false }
+            judge: { protocol_tone: 0.9 }
+
+  - id: clarify-quick-pick-reply
+    description: >-
+      The console renders a clarification's options as buttons that re-enter
+      the same send path, so the reply is just the option text. It has to
+      resolve on the next turn, not loop the question.
+    persona:
+      sub: platform-sre
+      name: Platform SRE
+      email: platform.sre@example.internal
+      groups: [retail-sre]
+    turns:
+      - user: is my stuff healthy?
+        expect:
+          outcome: clarify:application
+          clarify_options: 6
+          phases: []
+      - user: catalog
+        expect:
+          outcome: resolved
+          context:
+            application: catalog
+            environment: prod
+            clusters: [acm-spoke-1a]
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true, count: 1 }
+
+  - id: narrative-degrades-with-correlation-id
+    description: >-
+      F8. The analyst tier is the only part of a turn that needs an inference
+      backend, so it is the only part allowed to fail softly: the cards stand
+      and the turn completes with an error fence carrying the correlation id
+      the platform team pulls the trace with. Live mode only - the fake model
+      has no endpoint to lose.
+    modes: [live]
+    inference_api_base: http://127.0.0.1:9/v1
+    persona:
+      sub: app-developer
+      name: App developer
+      email: app.developer@example.internal
+      groups: [payments-eng]
+    turns:
+      - user: why is my app flaky in prod?
+        expect:
+          outcome: resolved
+          context:
+            application: payments-api
+            environment: prod
+          attestation: { acm-spoke-1a: healthy }
+          app360: { emitted: true }
+          error:
+            phase: narrative
+            reason: inference_unreachable
+            correlation_id: true
