@@ -27,10 +27,12 @@ import asyncio
 import os
 import sys
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 import structlog
 
+from cloudops.common.config import load_yaml
 from cloudops.common.logging import setup_logging
 from cloudops.evals.judge import Judge, JudgeUnavailable, judge_config
 from cloudops.evals.report import CaseResult, Scorecard, SuiteResult, TurnResult, write_outputs
@@ -47,6 +49,19 @@ JUDGES_DIR = REPO_ROOT / "backend" / "evals" / "judges"
 DEFAULT_OUT = REPO_ROOT / "backend" / "evals" / "out"
 
 
+@lru_cache(maxsize=1)
+def _known_tools() -> tuple[str, ...]:
+    """Every tool name the gateway can legitimately expose, from the committed
+    servers.yaml allowlists. Handed to the judges so "invented tool name" can
+    only ever mean a name outside this roster - a real tool the narrative
+    mentions without having called it is commentary, not invention."""
+    servers = load_yaml(REPO_ROOT / "config" / "gateway" / "servers.yaml") or {}
+    return tuple(sorted(
+        f"{s['prefix']}__{t}"
+        for s in servers.get("servers", []) for t in s.get("allow_tools", [])
+    ))
+
+
 async def _judge_turn(
     judge: Judge, thresholds: dict[str, float], question: str, record: object
 ) -> list[Metric]:
@@ -60,7 +75,7 @@ async def _judge_turn(
     for name, threshold in thresholds.items():
         verdict = await judge.score(
             name, question=question, narrative=record.analyst_text or record.narrative,
-            evidence=record.evidence(),
+            evidence={**record.evidence(), "known_tools": list(_known_tools())},
         )
         metrics.append(Metric(
             metric=f"judge.{name}",

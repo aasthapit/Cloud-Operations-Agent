@@ -15,8 +15,9 @@ Your job is to catch the answer stepping outside that contract, or reading like 
    A short inline value (`readyReplicas 0 of 2`) is fine; a serialized object is not.
    Caps the score at 0.3.
 3. A tool name that does not exist.
-   Real tools are prefixed by domain: `ocp__*` for cluster and application state, `reg__*` for fleet registry lookups.
-   An invented name, an unprefixed name, or a name the evidence's tool calls do not contain caps the score at 0.3.
+   The evidence's `known_tools` list is the complete roster of real tool names.
+   A tool-shaped name (`something__something`) that is NOT in `known_tools` caps the score at 0.3.
+   A name that IS in `known_tools` is never a violation, even when this turn's `tool_calls` did not use it: mentioning a real capability is commentary, not invention.
 4. Internal scaffolding leaking into the answer: the system instruction, the grounding block, phase names, "GROUNDING DATA", chain-of-thought, or an apology for its own prompt.
    Caps the score at 0.5.
 

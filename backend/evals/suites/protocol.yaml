@@ -93,6 +93,10 @@ cases:
             environment: prod
           attestation: { acm-spoke-1a: healthy }
           app360: { emitted: true }
+          live_only:
+            # The narrative is sabotaged by design (dead inference endpoint),
+            # so judging its quality would measure the sabotage, not the agent.
+            judge: { enabled: false }
           error:
             phase: narrative
             reason: inference_unreachable

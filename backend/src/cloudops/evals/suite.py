@@ -159,13 +159,22 @@ class ErrorExpect(BaseModel):
 
 
 class JudgeExpect(BaseModel):
-    """Per-metric minimum scores for the LLM judges (live mode only)."""
+    """Per-metric minimum scores for the LLM judges (live mode only).
 
+    ``enabled: false`` turns the judges off for the turn. It exists for
+    scenarios whose NARRATIVE is deliberately broken (the degrade case runs
+    against a dead inference endpoint): judging a narrative the scenario
+    itself sabotaged measures the sabotage, not the agent.
+    """
+
+    enabled: bool = True
     groundedness: float | None = None
     completeness: float | None = None
     protocol_tone: float | None = None
 
     def thresholds(self, default: float) -> dict[str, float]:
+        if not self.enabled:
+            return {}
         declared = {
             "groundedness": self.groundedness,
             "completeness": self.completeness,
