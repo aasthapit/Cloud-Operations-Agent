@@ -69,7 +69,8 @@ async def _judge_turn(
     from cloudops.evals.capture import TurnRecord
 
     assert isinstance(record, TurnRecord)
-    if not record.narrative.strip():
+    if not (record.analyst_text or "").strip():
+        # No analyst narrative this turn (runtime copy only): nothing to grade.
         return []
     metrics: list[Metric] = []
     for name, threshold in thresholds.items():
@@ -105,7 +106,12 @@ async def _score_case(
 
     for turn_spec, record in zip(case.turns, records, strict=True):
         metrics = score_turn(turn_spec, record, mode)
-        if judge is not None:
+        # Judges grade the ANALYST's answer. A clarify or onboarding turn has
+        # no analyst answer - its visible text is runtime-authored copy the
+        # deterministic scorers already assert - so judging it would grade the
+        # product's question-asking design instead of the model.
+        judgeable = (turn_spec.expect.outcome or "resolved") == "resolved"
+        if judge is not None and judgeable:
             thresholds = turn_spec.expect.live_only.judge.thresholds(suite.threshold_for(case))
             metrics += await _judge_turn(judge, thresholds, turn_spec.user, record)
         result.turns.append(TurnResult(
